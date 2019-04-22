@@ -44,7 +44,7 @@ ID3D12Device* _dev = nullptr;
 ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
-
+IDXGISwapChain4* _swapchain = nullptr;
 
 #ifdef _DEBUG
 int main() {
@@ -117,6 +117,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;//プライオリティ特に指定なし
 	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;//ここはコマンドリストと合わせてください
 	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));//コマンドキュー生成
+
+	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
+	swapchainDesc.Width = window_width;
+	swapchainDesc.Height = window_height;
+	swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapchainDesc.Stereo = false;
+	swapchainDesc.SampleDesc.Count = 1;
+	swapchainDesc.SampleDesc.Quality = 0;
+	swapchainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
+	swapchainDesc.BufferCount = 2;
+	swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
+	swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+	swapchainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+	result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, 
+		hwnd, 
+		&swapchainDesc,
+		nullptr,
+		nullptr,
+		(IDXGISwapChain1**)&_swapchain);
 
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 	MSG msg = {};
