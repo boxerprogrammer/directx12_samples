@@ -139,6 +139,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		nullptr,
 		(IDXGISwapChain1**)&_swapchain);
 
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;//レンダーターゲットビューなので当然RTV
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = 2;//表裏の２つ
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;//特に指定なし
+	ID3D12DescriptorHeap* rtvHeaps = nullptr;
+	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 	MSG msg = {};
 	while (true) {
@@ -150,6 +158,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		if (msg.message == WM_QUIT) {			
 			break;
 		}
+
+
+		//DirectX処理
+		result = _cmdAllocator->Reset();
+
+
+
+		_swapchain->Present(1, 0);
 
 	}
 	//もうクラス使わんから登録解除してや
