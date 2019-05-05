@@ -75,3 +75,6 @@
 /Chapter4/x64/Debug/vc141.pdb
 /Debug/Chapter4.pdb
 /Debug/Chapter4.ilk
+/.vs/Dx12BookSamples/v15/ipch/AutoPCH/bfc29ab2c56d8bee/MAIN.ipch
+/.vs/Dx12BookSamples/v15/ipch/AutoPCH/13611a28ba01656d/MAIN.ipch
+*.log
