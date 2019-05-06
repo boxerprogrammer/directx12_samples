@@ -78,3 +78,8 @@
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/bfc29ab2c56d8bee/MAIN.ipch
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/13611a28ba01656d/MAIN.ipch
 *.log
+/Chapter4/Debug/Chapter4.tlog/CL.write.1.tlog
+/Chapter4/Debug/Chapter4.tlog/CL.read.1.tlog
+/.vs/Dx12BookSamples/v15/ipch/AutoPCH/ba3cff947e5582a/D3D12.ipch
+/.vs/Dx12BookSamples/v15/ipch/AutoPCH/8e645262de287976/MAIN.ipch
+/.vs/Dx12BookSamples/v15/ipch/AutoPCH/eb1a0c95f5b29c85/MAIN.ipch

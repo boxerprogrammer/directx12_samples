@@ -224,9 +224,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdQueue->ExecuteCommandLists(1, cmdlists);
 		////待ち
 		_cmdQueue->Signal(_fence, ++_fenceVal);
-		//while (_fence->GetCompletedValue() != _fenceVal) {
-		//	;//ビジーループ
-		//}
+
 		if(_fence->GetCompletedValue() != _fenceVal) {
 			auto event = CreateEvent(nullptr, false, false, nullptr);
 			_fence->SetEventOnCompletion(_fenceVal, event);
