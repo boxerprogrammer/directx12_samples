@@ -2,6 +2,7 @@
 #include<tchar.h>
 #include<d3d12.h>
 #include<dxgi1_6.h>
+#include<DirectXMath.h>
 #include<vector>
 #ifdef _DEBUG
 #include<iostream>
@@ -12,8 +13,8 @@
 #pragma comment(lib,"dxgi.lib")
 
 
-using namespace std;
 
+using namespace DirectX;
 ///@brief コンソール画面にフォーマット付き文字列を表示
 ///@param format フォーマット(%dとか%fとかの)
 ///@param 可変長引数
@@ -175,6 +176,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
 
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
+
+	XMFLOAT3 vertices[] = {
+		{-1,-1,0} ,//左下
+		{-1,1,0} ,//左上
+		{1,-1,0} ,//右下
+	};
+
 	MSG msg = {};
 	while (true) {
 

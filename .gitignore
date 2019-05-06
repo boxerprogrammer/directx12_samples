@@ -83,3 +83,6 @@
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/ba3cff947e5582a/D3D12.ipch
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/8e645262de287976/MAIN.ipch
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/eb1a0c95f5b29c85/MAIN.ipch
+/Chapter5/Chapter5.vcxproj.user
+/Chapter5/.vs/Chapter5/v15/Browse.VC.db
+/Chapter5/.vs/Chapter5/v15/.suo
