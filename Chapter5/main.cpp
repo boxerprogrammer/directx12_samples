@@ -198,15 +198,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	resdesc.SampleDesc.Count = 1;
 	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 	resdesc.Layout =  D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	
 
+	//UPLOAD(Šm•Û‚Í‰Â”\)
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop,
 		D3D12_HEAP_FLAG_NONE,
 		&resdesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
+		D3D12_RESOURCE_STATE_COPY_DEST,
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
+
+	XMFLOAT3* vertMap=nullptr;
+	result=vertBuff->Map(0, nullptr, (void**)&vertMap);
+
+	std::copy(std::begin(vertices), std::end(vertices), vertMap);
+
+	vertBuff->Unmap(0, nullptr);
+
+
 	MSG msg = {};
 	while (true) {
 

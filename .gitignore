@@ -104,3 +104,15 @@
 /x64/Debug/Chapter5.pdb
 /x64/Debug/Chapter5.ilk
 /.vs/Dx12BookSamples/v15/ipch/AutoPCH/bea5bd31df32b0c4/MAIN.ipch
+*.ipch
+/Chapter5/Debug/vc141.pdb
+/Chapter5/Debug/vc141.idb
+/Chapter5/Debug/Chapter5.tlog/link.write.1.tlog
+/Chapter5/Debug/Chapter5.tlog/link.read.1.tlog
+/Chapter5/Debug/Chapter5.tlog/link.command.1.tlog
+/Chapter5/Debug/Chapter5.tlog/CL.write.1.tlog
+/Chapter5/Debug/Chapter5.tlog/CL.read.1.tlog
+/Chapter5/Debug/Chapter5.tlog/CL.command.1.tlog
+/Chapter5/Debug/Chapter5.tlog/Chapter5.lastbuildstate
+/Debug/Chapter5.pdb
+/Debug/Chapter5.ilk
