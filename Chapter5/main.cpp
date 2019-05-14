@@ -178,9 +178,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	XMFLOAT3 vertices[] = {
-	{-1,-1,0} ,//左下
-	{-1,1,0} ,//左上
-	{1,-1,0} ,//右下
+		{-1,-1,0} ,//左下
+		{-1,1,0} ,//左上
+		{1,-1,0} ,//右下
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -216,6 +216,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::copy(std::begin(vertices), std::end(vertices), vertMap);
 
 	vertBuff->Unmap(0, nullptr);
+
+	D3D12_VERTEX_BUFFER_VIEW vbView = {};
+	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
+	vbView.SizeInBytes = sizeof(vertices);//全バイト数
+	vbView.StrideInBytes = sizeof(vertices[0]);//1頂点あたりのバイト数
+
 
 
 	MSG msg = {};
