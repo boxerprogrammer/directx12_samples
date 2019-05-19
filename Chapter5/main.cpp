@@ -4,6 +4,9 @@
 #include<dxgi1_6.h>
 #include<DirectXMath.h>
 #include<vector>
+
+#include<d3dcompiler.h>
+
 #ifdef _DEBUG
 #include<iostream>
 #endif
@@ -11,7 +14,7 @@
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
-
+#pragma comment(lib,"d3dcompiler.lib")
 
 using namespace DirectX;
 
@@ -222,7 +225,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vbView.SizeInBytes = sizeof(vertices);//全バイト数
 	vbView.StrideInBytes = sizeof(vertices[0]);//1頂点あたりのバイト数
 
+	ID3DBlob* _vsBlob = nullptr;
+	ID3DBlob* _psBlob = nullptr;
 
+	ID3DBlob* errorBlob = nullptr;
+	result = D3DCompileFromFile(L"BasicShader.hlsl",
+		nullptr, nullptr, 
+		"BasicVS", "vs_5_0", 
+		D3DCOMPILE_DEBUG| D3DCOMPILE_SKIP_OPTIMIZATION,
+		0,&_vsBlob, &errorBlob);
+	if (FAILED(result)) {
+		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+			::OutputDebugStringA("ファイルが見当たりません");
+			return 0;//行儀悪いかな…
+		}
+		else {
+			std::string errstr;
+			errstr.resize(errorBlob->GetBufferSize());
+			std::copy_n(errstr.data(), errorBlob->GetBufferPointer(), errorBlob->GetBufferSize());
+			errstr += "\n";
+			OutputDebugStringA(errstr.c_str());
+		}
+	}
+	result = D3DCompileFromFile(L"BasicShader.hlsl",
+		nullptr, nullptr,
+		"BasicPS", "ps_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+		0, &_vsBlob, &errorBlob);
 
 	MSG msg = {};
 	while (true) {
