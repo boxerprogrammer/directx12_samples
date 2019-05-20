@@ -242,7 +242,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		else {
 			std::string errstr;
 			errstr.resize(errorBlob->GetBufferSize());
-			std::copy_n(errstr.data(), errorBlob->GetBufferPointer(), errorBlob->GetBufferSize());
+			std::copy_n( (char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(),errstr.begin());
 			errstr += "\n";
 			OutputDebugStringA(errstr.c_str());
 		}
@@ -252,6 +252,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &_vsBlob, &errorBlob);
+
+
 
 	MSG msg = {};
 	while (true) {
