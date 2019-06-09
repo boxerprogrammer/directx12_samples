@@ -181,8 +181,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	XMFLOAT3 vertices[] = {
-		{-1,-1,0} ,//左下
-		{-1,1,0} ,//左上
+		{0,0,0} ,//左下
+		{0,1,0} ,//左上
 		{1,-1,0} ,//右下
 	};
 
@@ -309,6 +309,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12PipelineState* _pipelinestate = nullptr;
 	result = _dev->CreateGraphicsPipelineState(&gpipeline, IID_PPV_ARGS(&_pipelinestate));
 
+	D3D12_VIEWPORT viewport = {};
+	viewport.Width = window_width;
+	viewport.Height = window_height;
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.MaxDepth = 1.0f;
+	viewport.MinDepth = 0.0f;
+
+
+	D3D12_RECT scissorrect = {};
+	scissorrect.top = 0;
+	scissorrect.left = 0;
+	scissorrect.right = scissorrect.left+window_width;
+	scissorrect.bottom= scissorrect.top+ window_height;
+
+
+
 	MSG msg = {};
 	while (true) {
 
@@ -336,14 +353,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		_cmdList->ResourceBarrier(1, &BarrierDesc);
 
+		_cmdList->SetPipelineState(_pipelinestate);
+		
+
 		//レンダーターゲットを指定
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		_cmdList->OMSetRenderTargets(1, &rtvH , false, nullptr);
 
 		//画面クリア
-		float clearColor[] = {1.0f,1.0f,0.0f,1.0f};//黄色
+		float clearColor[] = {1.0f,0.0f,0.0f,1.0f};//黄色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+		_cmdList->RSSetViewports(1, &viewport);
+		_cmdList->RSSetScissorRects(1, &scissorrect);
+
+		
+		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		_cmdList->IASetVertexBuffers(0, 1, &vbView);
+
+		_cmdList->SetGraphicsRootSignature(rootsignature);
+
+		_cmdList->DrawInstanced(3, 1, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
@@ -351,6 +382,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//命令のクローズ
 		_cmdList->Close();
+
 
 		
 		//コマンドリストの実行
@@ -366,7 +398,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			CloseHandle(event);
 		}
 		_cmdAllocator->Reset();//キューをクリア
-		_cmdList->Reset(_cmdAllocator, nullptr);//再びコマンドリストをためる準備
+		_cmdList->Reset(_cmdAllocator, _pipelinestate);//再びコマンドリストをためる準備
 
 
 		//フリップ
