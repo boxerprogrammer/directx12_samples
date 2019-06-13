@@ -6,7 +6,6 @@
 #include<vector>
 
 #include<d3dcompiler.h>
-
 #ifdef _DEBUG
 #include<iostream>
 #endif
@@ -181,9 +180,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	XMFLOAT3 vertices[] = {
-		{0,0,0} ,//左下
-		{0,1,0} ,//左上
-		{1,-1,0} ,//右下
+		{-1.f,-1.f,0.0f} ,//左下
+		{0.f,1.f,0.0f} ,//左上
+		{1.f,-1.f,0.0f} ,//右下
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -207,8 +206,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop,
+		//&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&resdesc,
+		//&CD3DX12_RESOURCE_DESC::Buffer(sizeof(vertices)),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
@@ -277,14 +278,44 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	gpipeline.PS.BytecodeLength = _psBlob->GetBufferSize();
 	
 	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;//中身は0xffffffff
-	
+	gpipeline.BlendState.AlphaToCoverageEnable = false;
+	gpipeline.BlendState.IndependentBlendEnable = false;
+
+	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
+	renderTargetBlendDesc.BlendEnable = false;
+	renderTargetBlendDesc.LogicOpEnable = false;
+	renderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	renderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	renderTargetBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+	renderTargetBlendDesc.DestBlend = D3D12_BLEND_ZERO;
+	renderTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	renderTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	renderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
+
+	//gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
 	gpipeline.RasterizerState.MultisampleEnable = false;//まだアンチェリは使わない
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
 	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;//中身を塗りつぶす
 	gpipeline.RasterizerState.DepthClipEnable = true;//深度方向のクリッピングは有効に
+	
+	//残り
+	gpipeline.RasterizerState.FrontCounterClockwise = false;
+	gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+	gpipeline.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+	gpipeline.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+	gpipeline.RasterizerState.AntialiasedLineEnable = false;
+	gpipeline.RasterizerState.ForcedSampleCount = 0;
+	gpipeline.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+
+	gpipeline.DepthStencilState.DepthEnable = false;
+	gpipeline.DepthStencilState.StencilEnable = false;
 
 	gpipeline.InputLayout.pInputElementDescs = inputLayout;//レイアウト先頭アドレス
-	gpipeline.InputLayout.NumElements = 1;//レイアウト配列数
+	gpipeline.InputLayout.NumElements = _countof(inputLayout);//レイアウト配列数
 
 	gpipeline.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;//ストリップ時のカットなし
 	gpipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;//三角形で構成
@@ -327,6 +358,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	MSG msg = {};
+	unsigned int frame = 0;
 	while (true) {
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -362,17 +394,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->OMSetRenderTargets(1, &rtvH , false, nullptr);
 
 		//画面クリア
-		float clearColor[] = {1.0f,0.0f,0.0f,1.0f};//黄色
+		
+		float r, g, b;
+		r = (float)(0xff & frame >> 16) / 255.0f;
+		g = (float)(0xff & frame >>8) / 255.0f;
+		b = (float)(0xff & frame >> 0) / 255.0f;
+		float clearColor[] = { r,g,b,1.0f };//黄色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-
+		++frame;
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorrect);
-
+		_cmdList->SetGraphicsRootSignature(rootsignature);
 		
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 
-		_cmdList->SetGraphicsRootSignature(rootsignature);
+		
 
 		_cmdList->DrawInstanced(3, 1, 0, 0);
 
