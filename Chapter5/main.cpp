@@ -180,9 +180,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	XMFLOAT3 vertices[] = {
-		{-1.f,-1.f,0.0f} ,//左下
-		{0.f,1.f,0.0f} ,//左上
-		{1.f,-1.f,0.0f} ,//右下
+		{-0.5f,-0.7f,0.0f} ,//左下
+		{0.f,0.7f,0.0f} ,//左上
+		{0.5f,-0.7f,0.0f} ,//右下
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -278,20 +278,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	gpipeline.PS.BytecodeLength = _psBlob->GetBufferSize();
 	
 	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;//中身は0xffffffff
+
+	//
 	gpipeline.BlendState.AlphaToCoverageEnable = false;
 	gpipeline.BlendState.IndependentBlendEnable = false;
 
 	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
+
+	//ひとまず加算や乗算やαブレンディングは使用しない
 	renderTargetBlendDesc.BlendEnable = false;
-	renderTargetBlendDesc.LogicOpEnable = false;
-	renderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
-	renderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	renderTargetBlendDesc.SrcBlend = D3D12_BLEND_ONE;
-	renderTargetBlendDesc.DestBlend = D3D12_BLEND_ZERO;
-	renderTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	renderTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	//renderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	//renderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	//renderTargetBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+	//renderTargetBlendDesc.DestBlend = D3D12_BLEND_ZERO;
+	//renderTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	//renderTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	renderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+
+	//ひとまず論理演算は使用しない
+	renderTargetBlendDesc.LogicOpEnable = false;
+	//renderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 
 	//gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -341,19 +348,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = _dev->CreateGraphicsPipelineState(&gpipeline, IID_PPV_ARGS(&_pipelinestate));
 
 	D3D12_VIEWPORT viewport = {};
-	viewport.Width = window_width;
-	viewport.Height = window_height;
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.MaxDepth = 1.0f;
-	viewport.MinDepth = 0.0f;
+	viewport.Width = window_width;//出力先の幅(ピクセル数)
+	viewport.Height = window_height;//出力先の高さ(ピクセル数)
+	viewport.TopLeftX = 0;//出力先の左上座標X
+	viewport.TopLeftY = 0;//出力先の左上座標Y
+	viewport.MaxDepth = 1.0f;//深度最大値
+	viewport.MinDepth = 0.0f;//深度最小値
 
 
 	D3D12_RECT scissorrect = {};
-	scissorrect.top = 0;
-	scissorrect.left = 0;
-	scissorrect.right = scissorrect.left+window_width;
-	scissorrect.bottom= scissorrect.top+ window_height;
+	scissorrect.top = 0;//切り抜き上座標
+	scissorrect.left = 0;//切り抜き左座標
+	scissorrect.right = scissorrect.left+window_width;//切り抜き右座標
+	scissorrect.bottom= scissorrect.top+ window_height;//切り抜き下座標
 
 
 
