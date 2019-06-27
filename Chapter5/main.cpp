@@ -180,9 +180,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	XMFLOAT3 vertices[] = {
-		{-0.5f,-0.7f,0.0f} ,//左下
-		{0.f,0.7f,0.0f} ,//左上
-		{0.5f,-0.7f,0.0f} ,//右下
+		{-0.4f,-0.7f,0.0f} ,//左下
+		{-0.4f,0.7f,0.0f} ,//左上
+		{0.4f,-0.7f,0.0f} ,//右下
+		{0.4f,0.7f,0.0f} ,//右上
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -418,7 +419,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		
 
-		_cmdList->DrawInstanced(3, 1, 0, 0);
+		_cmdList->DrawInstanced(4, 1, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
