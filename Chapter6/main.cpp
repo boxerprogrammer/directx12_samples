@@ -21,7 +21,7 @@ using namespace DirectX;
 ///@param format フォーマット(%dとか%fとかの)
 ///@param 可変長引数
 ///@remarksこの関数はデバッグ用です。デバッグ時にしか動作しません
-void DebugOutputFormatString(const char* format , ...) {
+void DebugOutputFormatString(const char* format, ...) {
 #ifdef _DEBUG
 	va_list valist;
 	va_start(valist, format);
@@ -39,8 +39,8 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	return DefWindowProc(hwnd, msg, wparam, lparam);//規定の処理を行う
 }
 
-const unsigned int window_width=1280;
-const unsigned int window_height=720;
+const unsigned int window_width = 1280;
+const unsigned int window_height = 720;
 
 IDXGIFactory6* _dxgiFactory = nullptr;
 ID3D12Device* _dev = nullptr;
@@ -49,8 +49,8 @@ ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
 
-void EnableDebugLayer(){
-	ID3D12Debug* debugLayer=nullptr;
+void EnableDebugLayer() {
+	ID3D12Debug* debugLayer = nullptr;
 	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
 	debugLayer->EnableDebugLayer();
 	debugLayer->Release();
@@ -62,7 +62,7 @@ int main() {
 #include<Windows.h>
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #endif
-	DebugOutputFormatString( "Show window test.");
+	DebugOutputFormatString("Show window test.");
 	HINSTANCE hInst = GetModuleHandle(nullptr);
 	//ウィンドウクラス生成＆登録
 	WNDCLASSEX w = {};
@@ -72,7 +72,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	w.hInstance = GetModuleHandle(0);//ハンドルの取得
 	RegisterClassEx(&w);//アプリケーションクラス(こういうの作るからよろしくってOSに予告する)
 
-	RECT wrc = { 0,0, window_width, window_height};//ウィンドウサイズを決める
+	RECT wrc = { 0,0, window_width, window_height };//ウィンドウサイズを決める
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);//ウィンドウのサイズはちょっと面倒なので関数を使って補正する
 	//ウィンドウオブジェクトの生成
 	HWND hwnd = CreateWindow(w.lpszClassName,//クラス名指定
@@ -124,7 +124,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 	}
 
-	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,IID_PPV_ARGS(& _cmdAllocator));
+	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
 	//_cmdList->Close();
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
@@ -147,10 +147,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	swapchainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-	
 
-	result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, 
-		hwnd, 
+
+	result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue,
+		hwnd,
 		&swapchainDesc,
 		nullptr,
 		nullptr,
@@ -179,7 +179,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
-	///頂点データ構造体
 	struct Vertex {
 		XMFLOAT3 pos;//XYZ座標
 		XMFLOAT2 uv;//UV座標
@@ -206,8 +205,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	resdesc.Format = DXGI_FORMAT_UNKNOWN;
 	resdesc.SampleDesc.Count = 1;
 	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resdesc.Layout =  D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
 
 	//UPLOAD(確保は可能)
 	ID3D12Resource* vertBuff = nullptr;
@@ -221,8 +220,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
 
-	Vertex* vertMap=nullptr;
-	result=vertBuff->Map(0, nullptr, (void**)&vertMap);
+	Vertex* vertMap = nullptr;
+	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 
 	std::copy(std::begin(vertices), std::end(vertices), vertMap);
 
@@ -233,15 +232,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vbView.SizeInBytes = sizeof(vertices);//全バイト数
 	vbView.StrideInBytes = sizeof(vertices[0]);//1頂点あたりのバイト数
 
+	unsigned short indices[] = { 0,1,2, 2,1,3 };
+
+	ID3D12Resource* idxBuff = nullptr;
+	//設定は、バッファのサイズ以外頂点バッファの設定を使いまわして
+	//OKだと思います。
+	resdesc.Width = sizeof(indices);
+	result = _dev->CreateCommittedResource(
+		&heapprop,
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&idxBuff));
+
+	//作ったバッファにインデックスデータをコピー
+	unsigned short* mappedIdx = nullptr;
+	idxBuff->Map(0, nullptr, (void**)&mappedIdx);
+	std::copy(std::begin(indices), std::end(indices), mappedIdx);
+	idxBuff->Unmap(0, nullptr);
+
+	//インデックスバッファビューを作成
+	D3D12_INDEX_BUFFER_VIEW ibView = {};
+	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
+	ibView.Format = DXGI_FORMAT_R16_UINT;
+	ibView.SizeInBytes = sizeof(indices);
+
+
+
 	ID3DBlob* _vsBlob = nullptr;
 	ID3DBlob* _psBlob = nullptr;
 
 	ID3DBlob* errorBlob = nullptr;
 	result = D3DCompileFromFile(L"BasicShader.hlsl",
-		nullptr, nullptr, 
-		"BasicVS", "vs_5_0", 
-		D3DCOMPILE_DEBUG| D3DCOMPILE_SKIP_OPTIMIZATION,
-		0,&_vsBlob, &errorBlob);
+		nullptr, nullptr,
+		"BasicVS", "vs_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+		0, &_vsBlob, &errorBlob);
 	if (FAILED(result)) {
 		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
 			::OutputDebugStringA("ファイルが見当たりません");
@@ -249,7 +276,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		else {
 			std::string errstr;
 			errstr.resize(errorBlob->GetBufferSize());
-			std::copy_n( (char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(),errstr.begin());
+			std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errstr.begin());
 			errstr += "\n";
 			OutputDebugStringA(errstr.c_str());
 		}
@@ -284,7 +311,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	gpipeline.VS.BytecodeLength = _vsBlob->GetBufferSize();
 	gpipeline.PS.pShaderBytecode = _psBlob->GetBufferPointer();
 	gpipeline.PS.BytecodeLength = _psBlob->GetBufferSize();
-	
+
 	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;//中身は0xffffffff
 
 	//
@@ -306,7 +333,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//ひとまず論理演算は使用しない
 	renderTargetBlendDesc.LogicOpEnable = false;
 	//renderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-	
+
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 
 	//gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -315,7 +342,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
 	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;//中身を塗りつぶす
 	gpipeline.RasterizerState.DepthClipEnable = true;//深度方向のクリッピングは有効に
-	
+
 	//残り
 	gpipeline.RasterizerState.FrontCounterClockwise = false;
 	gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
@@ -344,10 +371,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12RootSignature* rootsignature = nullptr;
 
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-	rootSignatureDesc.Flags= D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	ID3DBlob* rootSigBlob = nullptr;
-	result = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &rootSigBlob,&errorBlob);
+	result = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &rootSigBlob, &errorBlob);
 	result = _dev->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&rootsignature));
 	rootSigBlob->Release();
 
@@ -367,9 +394,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_RECT scissorrect = {};
 	scissorrect.top = 0;//切り抜き上座標
 	scissorrect.left = 0;//切り抜き左座標
-	scissorrect.right = scissorrect.left+window_width;//切り抜き右座標
-	scissorrect.bottom= scissorrect.top+ window_height;//切り抜き下座標
+	scissorrect.right = scissorrect.left + window_width;//切り抜き右座標
+	scissorrect.bottom = scissorrect.top + window_height;//切り抜き下座標
 
+
+	struct TexRGBA {
+		unsigned char R, G, B, A;
+	};
+	std::vector<TexRGBA> texturedata(256 * 256);
+
+	for (auto& rgba : texturedata) {
+		rgba.R = rand() % 256;
+		rgba.G = rand() % 256;
+		rgba.B = rand() % 256;
+		rgba.A = 255;//アルファは1.0という事にします。
+	}
 
 
 	MSG msg = {};
@@ -381,11 +420,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			DispatchMessage(&msg);
 		}
 		//もうアプリケーションが終わるって時にmessageがWM_QUITになる
-		if (msg.message == WM_QUIT) {			
+		if (msg.message == WM_QUIT) {
 			break;
 		}
-		
-		
+
+
 		//DirectX処理
 		//バックバッファのインデックスを取得
 		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
@@ -401,18 +440,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->ResourceBarrier(1, &BarrierDesc);
 
 		_cmdList->SetPipelineState(_pipelinestate);
-		
+
 
 		//レンダーターゲットを指定
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		_cmdList->OMSetRenderTargets(1, &rtvH , false, nullptr);
+		_cmdList->OMSetRenderTargets(1, &rtvH, false, nullptr);
 
 		//画面クリア
-		
+
 		float r, g, b;
 		r = (float)(0xff & frame >> 16) / 255.0f;
-		g = (float)(0xff & frame >>8) / 255.0f;
+		g = (float)(0xff & frame >> 8) / 255.0f;
 		b = (float)(0xff & frame >> 0) / 255.0f;
 		float clearColor[] = { r,g,b,1.0f };//黄色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
@@ -420,13 +459,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorrect);
 		_cmdList->SetGraphicsRootSignature(rootsignature);
-		
+
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
+		_cmdList->IASetIndexBuffer(&ibView);
 
-		
 
-		_cmdList->DrawInstanced(4, 1, 0, 0);
+		//_cmdList->DrawInstanced(4, 1, 0, 0);
+		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
@@ -436,14 +476,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->Close();
 
 
-		
+
 		//コマンドリストの実行
 		ID3D12CommandList* cmdlists[] = { _cmdList };
 		_cmdQueue->ExecuteCommandLists(1, cmdlists);
 		////待ち
 		_cmdQueue->Signal(_fence, ++_fenceVal);
 
-		if(_fence->GetCompletedValue() != _fenceVal) {
+		if (_fence->GetCompletedValue() != _fenceVal) {
 			auto event = CreateEvent(nullptr, false, false, nullptr);
 			_fence->SetEventOnCompletion(_fenceVal, event);
 			WaitForSingleObject(event, INFINITE);
@@ -455,9 +495,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//フリップ
 		_swapchain->Present(1, 0);
-		
+
 	}
 	//もうクラス使わんから登録解除してや
-	UnregisterClass(w.lpszClassName, w.hInstance);	
+	UnregisterClass(w.lpszClassName, w.hInstance);
 	return 0;
 }
