@@ -494,15 +494,70 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		nullptr,
 		IID_PPV_ARGS(&texbuff)
 	);
+	uint8_t* mapforImg = nullptr;//image->pixelsと同じ型にする
+	result = uploadbuff->Map(0, nullptr, (void**)&mapforImg);//マップ
+	std::copy_n(img->pixels, img->slicePitch, mapforImg);//コピー
+	uploadbuff->Unmap(0, nullptr);//アンマップ
 
-	uploadbuff->
+	D3D12_TEXTURE_COPY_LOCATION src = {}, dst = {};
+	dst.pResource = texbuff;
+	dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	dst.SubresourceIndex = 0;
 
-	result = texbuff->WriteToSubresource(0,
-		nullptr,//全領域へコピー
-		img->pixels,//元データアドレス
-		img->rowPitch,//1ラインサイズ
-		img->slicePitch//全サイズ
-	);
+	src.pResource = uploadbuff;//中間バッファ
+	src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;//フットプリント指定
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+	UINT nrow;
+	UINT64 rowsize, size;
+	auto desc=texbuff->GetDesc();
+	_dev->GetCopyableFootprints(&desc, 0, 1, 0, &footprint,&nrow,&rowsize,&size);
+	src.PlacedFootprint = footprint;
+	src.PlacedFootprint.Offset = 0;
+	src.PlacedFootprint.Footprint.Width = metadata.width;
+	src.PlacedFootprint.Footprint.Height = metadata.height;
+	src.PlacedFootprint.Footprint.Depth = metadata.depth;
+	src.PlacedFootprint.Footprint.RowPitch = img->rowPitch;
+	src.PlacedFootprint.Footprint.Format = img->format;
+
+	
+
+	{
+		//_cmdAllocator->Reset();//キューをクリア
+		//_cmdList->Reset(_cmdAllocator, nullptr);
+
+		_cmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+		
+		D3D12_RESOURCE_BARRIER BarrierDesc = {};
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = texbuff;
+		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+		_cmdList->ResourceBarrier(1, &BarrierDesc);
+		_cmdList->Close();
+		//コマンドリストの実行
+		ID3D12CommandList* cmdlists[] = { _cmdList };
+		_cmdQueue->ExecuteCommandLists(1, cmdlists);
+		////待ち
+		_cmdQueue->Signal(_fence, ++_fenceVal);
+
+		if (_fence->GetCompletedValue() != _fenceVal) {
+			auto event = CreateEvent(nullptr, false, false, nullptr);
+			_fence->SetEventOnCompletion(_fenceVal, event);
+			WaitForSingleObject(event, INFINITE);
+			CloseHandle(event);
+		}
+		_cmdAllocator->Reset();//キューをクリア
+		_cmdList->Reset(_cmdAllocator, nullptr);
+
+
+
+	}
+
+
+
 
 	ID3D12DescriptorHeap* texDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};

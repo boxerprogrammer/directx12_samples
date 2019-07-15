@@ -128,3 +128,5 @@
 /x64/Debug/BasicShader.cso
 /Chapter5/d3dx12.h
 x64
+/Chapter6_CopyTexture/img/textest.png
+/Chapter6_CopyTexture/Chapter6_copytex.vcxproj.user
