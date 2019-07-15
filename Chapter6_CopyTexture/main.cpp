@@ -7,6 +7,7 @@
 
 #include<d3dcompiler.h>
 #include<DirectXTex.h>
+#include<d3dx12.h>
 
 #ifdef _DEBUG
 #include<iostream>
@@ -128,7 +129,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
-	//_cmdList->Close();
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;//タイムアウトなし
 	cmdQueueDesc.NodeMask = 0;
@@ -177,7 +177,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 
 	for (int i = 0; i < swcDesc.BufferCount; ++i) {
-		//ID3D12Resource* backBuffer = nullptr;
 		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
 		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -221,10 +220,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop,
-		//&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&resdesc,
-		//&CD3DX12_RESOURCE_DESC::Buffer(sizeof(vertices)),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
@@ -638,7 +635,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-		//_cmdList->DrawInstanced(4, 1, 0, 0);
 		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;

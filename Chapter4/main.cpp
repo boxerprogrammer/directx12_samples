@@ -162,7 +162,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
 	D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 	for (int i = 0; i < swcDesc.BufferCount; ++i) {
-		//ID3D12Resource* backBuffer = nullptr;
 		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
 		_dev->CreateRenderTargetView(_backBuffers[i], nullptr, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

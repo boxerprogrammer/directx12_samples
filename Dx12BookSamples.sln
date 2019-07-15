@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter6", "Chapter6\Chapte
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter6_CopyTexture", "Chapter6_CopyTexture\Chapter6_copytex.vcxproj", "{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter7", "Chapter7\Chapter7.vcxproj", "{F20F8C25-F105-442B-8A00-8C0EEEBB9376}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -51,6 +53,14 @@ Global
 		{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}.Release|x64.Build.0 = Release|x64
 		{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}.Release|x86.ActiveCfg = Release|Win32
 		{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}.Release|x86.Build.0 = Release|Win32
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Debug|x64.ActiveCfg = Debug|x64
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Debug|x64.Build.0 = Debug|x64
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Debug|x86.ActiveCfg = Debug|Win32
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Debug|x86.Build.0 = Debug|Win32
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Release|x64.ActiveCfg = Release|x64
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Release|x64.Build.0 = Release|x64
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Release|x86.ActiveCfg = Release|Win32
+		{F20F8C25-F105-442B-8A00-8C0EEEBB9376}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

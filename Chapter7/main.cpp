@@ -177,6 +177,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 
 	for (int i = 0; i < swcDesc.BufferCount; ++i) {
+		//ID3D12Resource* backBuffer = nullptr;
 		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
 		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -220,8 +221,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop,
+		//&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&resdesc,
+		//&CD3DX12_RESOURCE_DESC::Buffer(sizeof(vertices)),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
@@ -328,12 +331,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//ひとまず加算や乗算やαブレンディングは使用しない
 	renderTargetBlendDesc.BlendEnable = false;
+	//renderTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	//renderTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	//renderTargetBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+	//renderTargetBlendDesc.DestBlend = D3D12_BLEND_ZERO;
+	//renderTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	//renderTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
 	//ひとまず論理演算は使用しない
 	renderTargetBlendDesc.LogicOpEnable = false;
+	//renderTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
 
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
+
+	//gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
 	gpipeline.RasterizerState.MultisampleEnable = false;//まだアンチェリは使わない
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
@@ -559,6 +571,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
 
+		//_cmdList->DrawInstanced(4, 1, 0, 0);
 		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
