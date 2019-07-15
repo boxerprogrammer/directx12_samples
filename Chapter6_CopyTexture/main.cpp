@@ -1,3 +1,4 @@
+//CopyTextureRegionを用いたテクスチャ貼り付け
 #include<Windows.h>
 #include<tchar.h>
 #include<d3d12.h>
@@ -7,7 +8,6 @@
 
 #include<d3dcompiler.h>
 #include<DirectXTex.h>
-#include<d3dx12.h>
 
 #ifdef _DEBUG
 #include<iostream>
