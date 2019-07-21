@@ -1,6 +1,11 @@
 Texture2D<float4> tex:register(t0);//0番スロットに設定されたテクスチャ
 SamplerState smp:register(s0);//0番スロットに設定されたサンプラ
 
+//定数バッファ
+cbuffer cbuff0 : register(b0) {
+	matrix mat;//変換行列
+};
+
 //頂点シェーダ→ピクセルシェーダへのやり取りに使用する
 //構造体
 struct Output {
@@ -10,7 +15,7 @@ struct Output {
 
 Output BasicVS(float4 pos : POSITION,float2 uv:TEXCOORD) {
 	Output output;//ピクセルシェーダへ渡す値
-	output.svpos = pos;
+	output.svpos = mul(mat,pos);
 	output.uv = uv;
 	return output;
 }
