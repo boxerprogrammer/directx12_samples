@@ -214,21 +214,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 
 	//PMD頂点構造体
-	struct PMDVertex {
-		XMFLOAT3 pos; //頂点座標(12バイト)
-		XMFLOAT3 normal; //法線ベクトル(12バイト)
-		XMFLOAT2 uv; //UV座標 (8バイト)
-		unsigned short boneNo[2]; // ボーン番号(後述)(4バイト)
-		unsigned char boneWeight; //ボーン影響度(後述)(1バイト)
-		unsigned char edgeFlg; //輪郭線フラグ(1バイト)
-	};//合計38バイト
+	//struct PMDVertex {
+	//	XMFLOAT3 pos; //頂点座標(12バイト)
+	//	XMFLOAT3 normal; //法線ベクトル(12バイト)
+	//	XMFLOAT2 uv; //UV座標 (8バイト)
+	//	unsigned short boneNo[2]; // ボーン番号(後述)(4バイト)
+	//	unsigned char boneWeight; //ボーン影響度(後述)(1バイト)
+	//	unsigned char edgeFlg; //輪郭線フラグ(1バイト)
+	//};//合計38バイト
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
-	//std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
-	std::vector<PMDVertex> vertices(vertNum);//バッファ確保
-	//fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
-	for (auto& v : vertices) {
-		fread(&v, pmdvertex_size, 1, fp);//一気に読み込み
-	}
+	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
+	//std::vector<PMDVertex> vertices(vertNum);//バッファ確保
+	fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
+
 	unsigned int indicesNum;//インデックス数
 	fread(&indicesNum, sizeof(indicesNum), 1, fp);
 	//UPLOAD(確保は可能)
@@ -236,22 +234,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()*sizeof(PMDVertex)),
+		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vertBuff));
 
-	//unsigned char* vertMap = nullptr;
-	PMDVertex* vertMap = nullptr;
+	unsigned char* vertMap = nullptr;
+	//PMDVertex* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 	std::copy(vertices.begin(), vertices.end(), vertMap);
 	vertBuff->Unmap(0, nullptr);
 
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
-	vbView.SizeInBytes = vertices.size()*sizeof(PMDVertex);//全バイト数
-	//vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
-	vbView.StrideInBytes = sizeof(PMDVertex);
+	vbView.SizeInBytes = vertices.size();//全バイト数
+	vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
+	//vbView.StrideInBytes = sizeof(PMDVertex);
 
 	std::vector<unsigned short> indices(indicesNum);
 
@@ -528,7 +526,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	XMMATRIX* mapMatrix;//マップ先を示すポインタ
 	result = constBuff->Map(0,nullptr,(void**)&mapMatrix);//マップ
 	*mapMatrix = worldMat*viewMat*projMat;//行列の内容をコピー
-	constBuff->Unmap(0, nullptr);
+	//constBuff->Unmap(0, nullptr);
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//シェーダから見えるように
@@ -566,9 +564,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	unsigned int frame = 0;
 	float angle = 0.0f;
 	while (true) {
-		//worldMat=XMMatrixRotationY(angle);
-		//*mapMatrix = worldMat * viewMat*projMat;
-		//angle += 0.01f;
+		worldMat=XMMatrixRotationY(angle);
+		*mapMatrix = worldMat * viewMat*projMat;
+		angle += 0.01f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -625,8 +623,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//heapHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//_cmdList->SetGraphicsRootDescriptorTable(1, heapHandle);
 
-		_cmdList->DrawInstanced(vertNum, 1, 0, 0);
-		//_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
+		//_cmdList->DrawInstanced(vertNum, 1, 0, 0);
+		_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
 
 		_cmdList->ResourceBarrier(1,
 			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
