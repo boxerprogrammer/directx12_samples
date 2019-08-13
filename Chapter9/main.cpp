@@ -264,6 +264,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//	unsigned char boneWeight; //ボーン影響度(後述)(1バイト)
 	//	unsigned char edgeFlg; //輪郭線フラグ(1バイト)
 	//};//合計38バイト
+#pragma pack(1)//ここから1バイトパッキング…アライメントは発生しない
+	//PMDマテリアル構造体
+	struct PMDMaterial {
+		XMFLOAT3 diffuse; //ディフューズ色
+		float alpha; // ディフューズα
+		float specularity;//スペキュラの強さ(乗算値)
+		XMFLOAT3 specular; //スペキュラ色
+		XMFLOAT3 ambient; //アンビエント色
+		unsigned char toonIdx; //トゥーン番号(後述)
+		unsigned char edgeFlg;//マテリアル毎の輪郭線フラグ
+		//2バイトのパディングが発生！！
+		unsigned int indicesNum; //このマテリアルが割り当たるインデックス数
+		char texture_file_name[20]; //テクスチャファイル名(プラスアルファ…後述)
+	};//70バイトのはず…でもパディングが発生するため72バイト
+#pragma pack()//1バイトパッキング解除
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
 	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
 	//std::vector<PMDVertex> vertices(vertNum);//バッファ確保
