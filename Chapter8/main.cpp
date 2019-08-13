@@ -546,6 +546,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//	img->rowPitch,//1ラインサイズ
 	//	img->slicePitch//全サイズ
 	//);
+	
+	//シェーダ側に渡すための基本的な行列データ
+	struct MatricesData {
+		XMMATRIX world;
+		XMMATRIX viewproj;
+	};
 
 	//定数バッファ作成
 	XMMATRIX worldMat = XMMatrixIdentity();
@@ -562,15 +568,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(XMMATRIX) + 0xff)&~0xff),
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(MatricesData) + 0xff)&~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&constBuff)
 	);
 
-	XMMATRIX* mapMatrix;//マップ先を示すポインタ
+	MatricesData* mapMatrix;//マップ先を示すポインタ
 	result = constBuff->Map(0,nullptr,(void**)&mapMatrix);//マップ
-	*mapMatrix = worldMat*viewMat*projMat;//行列の内容をコピー
+	//行列の内容をコピー
+	mapMatrix->world = worldMat;
+	mapMatrix->viewproj = viewMat*projMat;
 	//constBuff->Unmap(0, nullptr);
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
@@ -610,8 +618,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	float angle = 0.0f;
 	while (true) {
 		worldMat=XMMatrixRotationY(angle);
-		*mapMatrix = worldMat * viewMat*projMat;
-		angle += 0.01f;
+		mapMatrix->world = worldMat;
+		mapMatrix->viewproj = viewMat * projMat;
+		angle += 0.05f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
