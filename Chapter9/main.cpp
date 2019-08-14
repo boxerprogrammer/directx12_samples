@@ -279,13 +279,41 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		char texture_file_name[20]; //テクスチャファイル名(プラスアルファ…後述)
 	};//70バイトのはず…でもパディングが発生するため72バイト
 #pragma pack()//1バイトパッキング解除
+
+	//シェーダ側に投げられるマテリアルデータ
+	struct MaterialForHlsl{
+		XMFLOAT3 diffuse; //ディフューズ色
+		float alpha; // ディフューズα
+		XMFLOAT3 specular; //スペキュラ色
+		float specularity;//スペキュラの強さ(乗算値)
+		XMFLOAT3 ambient; //アンビエント色
+	};
+	//それ以外のマテリアルデータ
+	struct AdditionalMaterial {
+		std::string texPath;//テクスチャファイルパス
+		std::string addPath;//スフィアマップ(加算)ファイルパス
+		std::string mulPath;//スフィアマップ(乗算)ファイルパス
+		int texIdx;//ヒープ上のテクスチャ番号
+		int addIdx;//ヒープ上の加算テクスチャ番号
+		int mulIdx;//ヒープ上の乗算テクスチャ番号
+		int toonIdx; //トゥーン番号
+		bool edgeFlg;//マテリアル毎の輪郭線フラグ
+	};
+	//まとめたもの
+	struct Material {
+		unsigned int indicesNum;//インデックス数
+		MaterialForHlsl material;
+		AdditionalMaterial additional;
+	};
+
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
 	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
 	//std::vector<PMDVertex> vertices(vertNum);//バッファ確保
 	fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
 
 	unsigned int indicesNum;//インデックス数
-	fread(&indicesNum, sizeof(indicesNum), 1, fp);
+	fread(&indicesNum, sizeof(indicesNum), 1, fp);//
+
 	//UPLOAD(確保は可能)
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
@@ -309,9 +337,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//vbView.StrideInBytes = sizeof(PMDVertex);
 
 	std::vector<unsigned short> indices(indicesNum);
+	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);//一気に読み込み
 
-	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);
+	unsigned int materialNum;//マテリアル数
+	fread(&materialNum, sizeof(materialNum), 1, fp);
+	{
+		std::vector<PMDMaterial> pmdMaterials(materialNum);
+		std::vector<Material> materials;
+		fread(pmdMaterials.data(), pmdMaterials.size() * sizeof(PMDMaterial), 1, fp);
+		//コピー
+		for (int i = 0; i < pmdMaterials.size(); ++i) {
+			materials[i].indicesNum = pmdMaterials[i].indicesNum;
+			materials[i].material.diffuse = pmdMaterials[i].diffuse;
+			materials[i].material.alpha = pmdMaterials[i].alpha;
+			materials[i].material.specular = pmdMaterials[i].specular;
+			materials[i].material.specularity = pmdMaterials[i].specularity;
+			materials[i].material.ambient = pmdMaterials[i].ambient;
+		}
+	}
 	fclose(fp);
+	
 
 	ID3D12Resource* idxBuff = nullptr;
 	//設定は、バッファのサイズ以外頂点バッファの設定を使いまわして
