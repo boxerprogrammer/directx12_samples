@@ -1,10 +1,17 @@
 Texture2D<float4> tex:register(t0);//0番スロットに設定されたテクスチャ
 SamplerState smp:register(s0);//0番スロットに設定されたサンプラ
 
-//定数バッファ
-cbuffer cbuff0 : register(b0) {
+//定数バッファ0
+cbuffer Matrices : register(b0) {
 	matrix world;//ワールド変換行列
 	matrix viewproj;//ビュープロジェクション行列
+};
+//定数バッファ1
+//マテリアル用
+cbuffer Material : register(b1) {
+	float4 diffuse;//ディフューズ色
+	float4 specular;//スペキュラ
+	float3 ambient;//アンビエント
 };
 
 //頂点シェーダ→ピクセルシェーダへのやり取りに使用する
@@ -27,7 +34,7 @@ Output BasicVS(float4 pos : POSITION , float4 normal : NORMAL, float2 uv : TEXCO
 float4 BasicPS(Output input ) : SV_TARGET{
 	float3 light = normalize(float3(1,-1,1));
 	float brightness = dot(-light, input.normal);
-	return float4(brightness, brightness, brightness, 1);
+	return float4(brightness, brightness, brightness, 1)*diffuse;
 	//return float4(input.normal.xyz,1);
 	//return float4(tex.Sample(smp,input.uv));
 }
