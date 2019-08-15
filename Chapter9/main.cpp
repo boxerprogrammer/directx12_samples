@@ -54,6 +54,45 @@ ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
 
+///モデルのパスとテクスチャのパスから合成パスを得る
+///@param modelPath アプリケーションから見たpmdモデルのパス
+///@param texPath PMDモデルから見たテクスチャのパス
+///@return アプリケーションから見たテクスチャのパス
+std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, const char* texPath) {
+	//ファイルのフォルダ区切りは\と/の二種類が使用される可能性があり
+	//ともかく末尾の\か/を得られればいいので、双方のrfindをとり比較する
+	//int型に代入しているのは見つからなかった場合はrfindがepos(-1→0xffffffff)を返すため
+	int pathIndex1 = modelPath.rfind('/');
+	int pathIndex2 = modelPath.rfind('\\');
+	auto pathIndex = max(pathIndex1, pathIndex2);
+	auto folderPath = modelPath.substr(0, pathIndex);
+	return folderPath + texPath;
+}
+
+
+///string(マルチバイト文字列)からwstring(ワイド文字列)を得る
+///@param str マルチバイト文字列
+///@return 変換されたワイド文字列
+std::wstring
+GetWideStringFromString(const std::string& str) {
+	//呼び出し1回目(文字列数を得る)
+	auto num1 = MultiByteToWideChar(CP_ACP,
+		MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+		str.c_str(), -1, nullptr, 0);
+
+	std::wstring wstr;//stringのwchar_t版
+	wstr.resize(num1);//得られた文字列数でリサイズ
+
+	//呼び出し2回目(確保済みのwstrに変換文字列をコピー)
+	auto num2 = MultiByteToWideChar(CP_ACP,
+		MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+		str.c_str(), -1, &wstr[0], num1);
+
+	assert(num1 == num2);//一応チェック
+	return wstr;
+}
+
+
 void EnableDebugLayer() {
 	ID3D12Debug* debugLayer = nullptr;
 	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
