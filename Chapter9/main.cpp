@@ -154,6 +154,46 @@ CreateWhiteTexture() {
 }
 
 ID3D12Resource*
+CreateBlackTexture() {
+	D3D12_HEAP_PROPERTIES texHeapProp = {};
+	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
+	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
+	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
+	texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
+	texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
+
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.Width = 4;//幅
+	resDesc.Height = 4;//高さ
+	resDesc.DepthOrArraySize = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;//
+	resDesc.MipLevels = 1;//
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
+
+	ID3D12Resource* blackBuff = nullptr;
+	auto result = _dev->CreateCommittedResource(
+		&texHeapProp,
+		D3D12_HEAP_FLAG_NONE,//特に指定なし
+		&resDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		nullptr,
+		IID_PPV_ARGS(&blackBuff)
+	);
+	if (FAILED(result)) {
+		return nullptr;
+	}
+	std::vector<unsigned char> data(4 * 4 * 4);
+	std::fill(data.begin(), data.end(), 0x00);
+
+	result = blackBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, data.size());
+	return blackBuff;
+}
+
+ID3D12Resource*
 LoadTextureFromFile(std::string& texPath ) {
 	//WICテクスチャのロード
 	TexMetadata metadata = {};
@@ -408,6 +448,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	depthResDesc.Format=DXGI_FORMAT_D32_FLOAT;//深度値書き込み用フォーマット
 	depthResDesc.SampleDesc.Count = 1;//サンプルは1ピクセル当たり1つ
 	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//このバッファは深度ステンシルとして使用します
+	depthResDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	depthResDesc.MipLevels = 1;
 
 	//デプス用ヒーププロパティ
 	D3D12_HEAP_PROPERTIES depthHeapProp = {};
@@ -433,6 +475,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};//深度に使うよという事がわかればいい
 	dsvHeapDesc.NumDescriptors = 1;//深度ビュー1つのみ
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;//デプスステンシルビューとして使う
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	ID3D12DescriptorHeap* dsvHeap = nullptr;
 	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
 
@@ -451,6 +494,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
 
 	auto whiteTex = CreateWhiteTexture();
+	auto blackTex = CreateBlackTexture();
 
 	//PMDヘッダ構造体
 	struct PMDHeader {
@@ -460,7 +504,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 	char signature[3];
 	PMDHeader pmdheader = {};
-	string strModelPath = "Model/巡音ルカ.pmd";
+	//string strModelPath = "Model/巡音ルカ.pmd";
+	string strModelPath = "Model/初音ミクmetal.pmd";
 	auto fp = fopen(strModelPath.c_str(), "rb");
 	fread(signature, sizeof(signature), 1, fp);
 	fread(&pmdheader, sizeof(pmdheader), 1, fp);
@@ -513,7 +558,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
 	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
-	//std::vector<PMDVertex> vertices(vertNum);//バッファ確保
 	fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
 
 	unsigned int indicesNum;//インデックス数
@@ -547,7 +591,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::vector<Material> materials(materialNum);
 
 	vector<ID3D12Resource*> textureResources(materialNum);
-
+	vector<ID3D12Resource*> sphResources(materialNum);
+	vector<ID3D12Resource*> spaResources(materialNum);
 	{
 		std::vector<PMDMaterial> pmdMaterials(materialNum);
 		fread(pmdMaterials.data(), pmdMaterials.size() * sizeof(PMDMaterial), 1, fp);
@@ -567,19 +612,48 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				continue;
 			}
 
-			string texFileName = pmdMaterials[i].texFilePath;
-			if (count(texFileName.begin(), texFileName.end(), '*') > 0) {//スプリッタがある→スフィアマップあり
+			string texFileName= pmdMaterials[i].texFilePath;
+			string sphFileName="";
+			string spaFileName="";
+			if (count(texFileName.begin(), texFileName.end(), '*') > 0) {//スプリッタがある
 				auto namepair=SplitFileName(texFileName);
-				if (GetExtension(namepair.first) == "sph"|| GetExtension(namepair.first) == "spa") {
+				if (GetExtension(namepair.first) == "sph") {
 					texFileName = namepair.second;
+					sphFileName = namepair.first;
+				}
+				else if (GetExtension(namepair.first) == "spa") {
+					texFileName = namepair.second;
+					spaFileName = namepair.first;
 				}
 				else {
 					texFileName = namepair.first;
+					if (GetExtension(namepair.second) == "sph") {
+						sphFileName = namepair.second;
+					}
+					else if (GetExtension(namepair.second) == "spa") {
+						spaFileName = namepair.second;
+					}
+				}
+			}
+			else {
+				if (GetExtension(pmdMaterials[i].texFilePath) == "sph") {
+					sphFileName= pmdMaterials[i].texFilePath;
+					texFileName = "";
+				}else if (GetExtension(pmdMaterials[i].texFilePath) == "spa") {
+					spaFileName = pmdMaterials[i].texFilePath;
+					texFileName = "";
+				}
+				else {
+					texFileName = pmdMaterials[i].texFilePath;
 				}
 			}
 			//モデルとテクスチャパスからアプリケーションからのテクスチャパスを得る
 			auto texFilePath = GetTexturePathFromModelAndTexPath(strModelPath, texFileName.c_str());
 			textureResources[i] =LoadTextureFromFile(texFilePath);
+			auto sphFilePath = GetTexturePathFromModelAndTexPath(strModelPath, sphFileName.c_str());
+			sphResources[i] = LoadTextureFromFile(sphFilePath);
+			auto spaFilePath = GetTexturePathFromModelAndTexPath(strModelPath, spaFileName.c_str());
+			spaResources[i] = LoadTextureFromFile(spaFilePath);
 		}
 
 	}
@@ -636,7 +710,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	ID3D12DescriptorHeap* materialDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC materialDescHeapDesc = {};
-	materialDescHeapDesc.NumDescriptors = materialNum*2;//マテリアル数ぶん
+	materialDescHeapDesc.NumDescriptors = materialNum * 4;//マテリアル数ぶん(定数1つ、テクスチャ3つ)
 	materialDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	materialDescHeapDesc.NodeMask = 0;
 	
@@ -668,6 +742,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			_dev->CreateShaderResourceView(textureResources[i], &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
+
+		if (sphResources[i] == nullptr) {
+			srvDesc.Format = whiteTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(whiteTex, &srvDesc, matDescHeapH);
+		}
+		else {
+			srvDesc.Format = sphResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(sphResources[i], &srvDesc, matDescHeapH);
+		}
+		matDescHeapH.ptr += incSize;
+
+		if (spaResources[i] == nullptr) {
+			srvDesc.Format = blackTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(blackTex, &srvDesc, matDescHeapH);
+		}
+		else {
+			srvDesc.Format = spaResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(spaResources[i], &srvDesc, matDescHeapH);
+		}
+		matDescHeapH.ptr += incSize;
+
 	}
 
 	ID3DBlob* _vsBlob = nullptr;
@@ -743,7 +838,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	renderTargetBlendDesc.LogicOpEnable = false;
 	
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
-
 	
 	gpipeline.RasterizerState.MultisampleEnable = false;//まだアンチェリは使わない
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
@@ -797,7 +891,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//テクスチャ1つ目(↑のマテリアルとペア)
-	descTblRange[2].NumDescriptors = 1;//テクスチャひとつ
+	descTblRange[2].NumDescriptors = 3;//テクスチャ３つ(基本とsphとspa)
 	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//種別はテクスチャ
 	descTblRange[2].BaseShaderRegister = 0;//0番スロットから
 	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -854,19 +948,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	scissorrect.right = scissorrect.left + window_width;//切り抜き右座標
 	scissorrect.bottom = scissorrect.top + window_height;//切り抜き下座標
 	
-	//シェーダ側に渡すための基本的な行列データ
-	struct MatricesData {
-		XMMATRIX world;
-		XMMATRIX viewproj;
+	//シェーダ側に渡すための基本的な環境データ
+	struct SceneData {
+		XMMATRIX world;//ワールド行列
+		XMMATRIX viewproj;//ビュープロジェクション行列
+		XMFLOAT3 eye;//視点座標
 	};
 
 	//定数バッファ作成
 	XMMATRIX worldMat = XMMatrixIdentity();
-	XMFLOAT3 eye(0, 10, -15);
-	XMFLOAT3 target(0, 10, 0);
+	XMFLOAT3 eye(0, 15, -15);
+	XMFLOAT3 target(0, 15, 0);
 	XMFLOAT3 up(0, 1, 0);
 	auto viewMat=XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
-	auto projMat=XMMatrixPerspectiveFovLH(XM_PIDIV2,//画角は90°
+	auto projMat=XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
 		static_cast<float>(window_width) / static_cast<float>(window_height),//アス比
 		1.0f,//近い方
 		100.0f//遠い方
@@ -875,18 +970,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(MatricesData) + 0xff)&~0xff),
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneData) + 0xff)&~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&constBuff)
 	);
 
-	MatricesData* mapMatrix=nullptr;//マップ先を示すポインタ
-	result = constBuff->Map(0,nullptr,(void**)&mapMatrix);//マップ
+	SceneData* mapScene=nullptr;//マップ先を示すポインタ
+	result = constBuff->Map(0,nullptr,(void**)&mapScene);//マップ
 	//行列の内容をコピー
-	mapMatrix->world = worldMat;
-	mapMatrix->viewproj = viewMat*projMat;
-
+	mapScene->world = worldMat;
+	mapScene->viewproj = viewMat*projMat;
+	mapScene->eye = eye;
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//シェーダから見えるように
@@ -907,11 +1002,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	MSG msg = {};
 	unsigned int frame = 0;
 	float angle = 0.0f;
+	auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
 	while (true) {
 		worldMat=XMMatrixRotationY(angle);
-		mapMatrix->world = worldMat;
-		mapMatrix->viewproj = viewMat * projMat;
-		angle += 0.05f;
+		mapScene->world = worldMat;
+		mapScene->viewproj = viewMat * projMat;
+		angle += 0.01f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -936,7 +1032,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//レンダーターゲットを指定
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+		
 		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
 		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 		//画面クリア
@@ -963,15 +1059,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		auto materialH = materialDescHeap->GetGPUDescriptorHandleForHeapStart();
 		unsigned int idxOffset = 0;
-		auto cbvsrvIncSize= _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*2;
 
-		//_cmdList->DrawInstanced(14400, 1, 0, 0);
-		for (auto& m : materials) {
-			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
-			_cmdList->DrawIndexedInstanced(m.indicesNum, 1,idxOffset, 0, 0);
-			materialH.ptr += cbvsrvIncSize;
-			idxOffset += m.indicesNum;			
-		}
+	auto cbvsrvIncSize= _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*4;
+	for (auto& m : materials) {
+		_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
+		_cmdList->DrawIndexedInstanced(m.indicesNum, 1,idxOffset, 0, 0);
+		materialH.ptr += cbvsrvIncSize;
+		idxOffset += m.indicesNum;			
+	}
 
 		_cmdList->ResourceBarrier(1,
 			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
