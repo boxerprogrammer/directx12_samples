@@ -38,7 +38,7 @@ Output BasicVS(float4 pos : POSITION , float4 normal : NORMAL, float2 uv : TEXCO
 
 float4 BasicPS(Output input ) : SV_TARGET{
 	float3 light = normalize(float3(1,-1,1));
-	float3 lightColor = float3(1, 1, 1);
+	float3 lightColor = float3(1,1,1);
 	float diffuseB = dot(-light, input.normal);
 
 	float3 up = float3(0, 1, 0);
@@ -61,12 +61,12 @@ float4 BasicPS(Output input ) : SV_TARGET{
 			*color//テクスチャカラー
 			*sph.Sample(smp, sphereMapUV))//スフィアマップ(乗算)
 
-		+ saturate(float4(pow(specularB, specular.w)
+		+ saturate(float4(pow(specularB, specular.a)
 			*specular.rgb
 			*lightColor, 1))
 
 
-		+ spa.Sample(smp, sphereMapUV);//スフィアマップ(加算)
-		+float4(color*ambient,1);//アンビエント
+		+ spa.Sample(smp, sphereMapUV)*color//スフィアマップ(加算)
+		+float4(color*ambient*0.5,1);//アンビエント
 
 }
