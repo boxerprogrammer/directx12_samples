@@ -5,7 +5,7 @@
 #include<dxgi1_6.h>
 #include<DirectXMath.h>
 #include<vector>
-
+#include<map>
 #include<d3dcompiler.h>
 #include<DirectXTex.h>
 #include<d3dx12.h>
@@ -76,6 +76,15 @@ string
 GetExtension(const std::string& path) {
 	int idx = path.rfind('.');
 	return path.substr(idx+1, path.length() - idx-1);
+}
+
+///ファイル名から拡張子を取得する(ワイド文字版)
+///@param path 対象のパス文字列
+///@return 拡張子
+wstring
+GetExtension(const std::wstring& path) {
+	int idx = path.rfind(L'.');
+	return path.substr(idx + 1, path.length() - idx - 1);
 }
 
 ///テクスチャのパスをセパレータ文字で分離する
@@ -192,17 +201,18 @@ CreateBlackTexture() {
 	result = blackBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, data.size());
 	return blackBuff;
 }
-
+using LoadLambda_t = function<HRESULT(const wstring& path, TexMetadata*, ScratchImage&)>;
+map < string, LoadLambda_t> loadLambdaTable;
 ID3D12Resource*
 LoadTextureFromFile(std::string& texPath ) {
 	//WICテクスチャのロード
 	TexMetadata metadata = {};
 	ScratchImage scratchImg = {};
-
-	auto result = LoadFromWICFile(GetWideStringFromString(texPath).c_str(), 
-		WIC_FLAGS_NONE, 
-		&metadata, 
-		scratchImg);
+	auto wtexpath = GetWideStringFromString(texPath);//テクスチャのファイルパス
+	auto ext = GetExtension(texPath);//拡張子を取得
+	auto result = loadLambdaTable[ext](wtexpath,
+						&metadata, 
+						scratchImg);
 	if (FAILED(result)) {
 		return nullptr;
 	}
@@ -411,6 +421,8 @@ HRESULT CreateFinalRenderTarget(ID3D12DescriptorHeap*& rtvHeaps, vector<ID3D12Re
 	}
 }
 
+
+
 #ifdef _DEBUG
 int main() {
 #else
@@ -437,6 +449,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12DescriptorHeap* rtvHeaps = nullptr;
 
 	result = CreateFinalRenderTarget(rtvHeaps, _backBuffers);
+
+
+
+	loadLambdaTable["sph"] = loadLambdaTable["spa"] = loadLambdaTable["bmp"] = loadLambdaTable["png"] = loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromWICFile(path.c_str(), 0, meta, img);
+	};
+
+	loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromTGAFile(path.c_str(), meta, img);
+	};
+
+	loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromDDSFile(path.c_str(), 0, meta, img);
+	};
 
 	//深度バッファ作成
 	//深度バッファの仕様
@@ -504,8 +530,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 	char signature[3];
 	PMDHeader pmdheader = {};
+	//string strModelPath = "Model/hibiki/hibiki.pmd";
+	//string strModelPath = "Model/satori/satori.pmd";
 	//string strModelPath = "Model/巡音ルカ.pmd";
-	string strModelPath = "Model/初音ミクmetal.pmd";
+	string strModelPath = "Model/初音ミク.pmd";
 	auto fp = fopen(strModelPath.c_str(), "rb");
 	fread(signature, sizeof(signature), 1, fp);
 	fread(&pmdheader, sizeof(pmdheader), 1, fp);
@@ -541,11 +569,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//それ以外のマテリアルデータ
 	struct AdditionalMaterial {
 		std::string texPath;//テクスチャファイルパス
-		std::string addPath;//スフィアマップ(加算)ファイルパス
-		std::string mulPath;//スフィアマップ(乗算)ファイルパス
-		int texIdx;//ヒープ上のテクスチャ番号
-		int addIdx;//ヒープ上の加算テクスチャ番号
-		int mulIdx;//ヒープ上の乗算テクスチャ番号
 		int toonIdx; //トゥーン番号
 		bool edgeFlg;//マテリアル毎の輪郭線フラグ
 	};
@@ -604,6 +627,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			materials[i].material.specular = pmdMaterials[i].specular;
 			materials[i].material.specularity = pmdMaterials[i].specularity;
 			materials[i].material.ambient = pmdMaterials[i].ambient;
+			materials[i].additional.toonIdx = pmdMaterials[i].toonIdx;
 		}
 
 		for (int i = 0; i < pmdMaterials.size(); ++i) {
@@ -648,12 +672,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				}
 			}
 			//モデルとテクスチャパスからアプリケーションからのテクスチャパスを得る
-			auto texFilePath = GetTexturePathFromModelAndTexPath(strModelPath, texFileName.c_str());
-			textureResources[i] =LoadTextureFromFile(texFilePath);
-			auto sphFilePath = GetTexturePathFromModelAndTexPath(strModelPath, sphFileName.c_str());
-			sphResources[i] = LoadTextureFromFile(sphFilePath);
-			auto spaFilePath = GetTexturePathFromModelAndTexPath(strModelPath, spaFileName.c_str());
-			spaResources[i] = LoadTextureFromFile(spaFilePath);
+			if (texFileName != "") {
+				auto texFilePath = GetTexturePathFromModelAndTexPath(strModelPath, texFileName.c_str());
+				textureResources[i] = LoadTextureFromFile(texFilePath);
+			}
+			if (sphFileName != "") {
+				auto sphFilePath = GetTexturePathFromModelAndTexPath(strModelPath, sphFileName.c_str());
+				sphResources[i] = LoadTextureFromFile(sphFilePath);
+			}
+			if (spaFileName != "") {
+				auto spaFilePath = GetTexturePathFromModelAndTexPath(strModelPath, spaFileName.c_str());
+				spaResources[i] = LoadTextureFromFile(spaFilePath);
+			}
 		}
 
 	}
@@ -951,7 +981,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//シェーダ側に渡すための基本的な環境データ
 	struct SceneData {
 		XMMATRIX world;//ワールド行列
-		XMMATRIX viewproj;//ビュープロジェクション行列
+		XMMATRIX view;//ビュープロジェクション行列
+		XMMATRIX proj;//
 		XMFLOAT3 eye;//視点座標
 	};
 
@@ -980,7 +1011,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = constBuff->Map(0,nullptr,(void**)&mapScene);//マップ
 	//行列の内容をコピー
 	mapScene->world = worldMat;
-	mapScene->viewproj = viewMat*projMat;
+	mapScene->view= viewMat;
+	mapScene->proj = projMat;
 	mapScene->eye = eye;
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
@@ -1006,7 +1038,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	while (true) {
 		worldMat=XMMatrixRotationY(angle);
 		mapScene->world = worldMat;
-		mapScene->viewproj = viewMat * projMat;
+		mapScene->view= viewMat;
+		mapScene->proj = projMat;
 		angle += 0.01f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -1060,13 +1093,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		auto materialH = materialDescHeap->GetGPUDescriptorHandleForHeapStart();
 		unsigned int idxOffset = 0;
 
-	auto cbvsrvIncSize= _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*4;
-	for (auto& m : materials) {
-		_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
-		_cmdList->DrawIndexedInstanced(m.indicesNum, 1,idxOffset, 0, 0);
-		materialH.ptr += cbvsrvIncSize;
-		idxOffset += m.indicesNum;			
-	}
+		auto cbvsrvIncSize= _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*4;
+		for (auto& m : materials) {
+			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
+			_cmdList->DrawIndexedInstanced(m.indicesNum, 1,idxOffset, 0, 0);
+			materialH.ptr += cbvsrvIncSize;
+			idxOffset += m.indicesNum;			
+		}
 
 		_cmdList->ResourceBarrier(1,
 			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
