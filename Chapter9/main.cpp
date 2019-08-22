@@ -596,8 +596,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 	char signature[3];
 	PMDHeader pmdheader = {};
-	string strModelPath = "Model/hibiki/hibiki.pmd";
-	//string strModelPath = "Model/satori/satori.pmd";
+	//string strModelPath = "Model/hibiki/hibiki.pmd";
+	string strModelPath = "Model/satori/satori.pmd";
 	//string strModelPath = "Model/reimu/reimu.pmd";
 	//string strModelPath = "Model/èÑâπÉãÉJ.pmd";
 	//string strModelPath = "Model/èââπÉ~ÉN.pmd";
