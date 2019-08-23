@@ -269,3 +269,8 @@ x64
 /Chapter9/Model/a1.sph
 /Chapter9/Model
 /Chapter9/img/textest.png
+*.bmp
+*.pmd
+*.sph
+*
+*.spa
