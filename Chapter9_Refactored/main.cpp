@@ -125,26 +125,9 @@ GetWideStringFromString(const std::string& str) {
 //トゥーンのためのグラデーションテクスチャ
 ID3D12Resource*
 CreateGrayGradationTexture() {
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Width = 4;//幅
-	resDesc.Height = 256;//高さ
-	resDesc.DepthOrArraySize = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;//
-	resDesc.MipLevels = 1;//
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
-
-
-	D3D12_HEAP_PROPERTIES texHeapProp = {};
-	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
-	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
-	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
-	texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
-	texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
-
+	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 256);
+	auto texHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
+	
 	ID3D12Resource* gradBuff = nullptr;
 	auto result = _dev->CreateCommittedResource(
 		&texHeapProp,
@@ -174,24 +157,9 @@ CreateGrayGradationTexture() {
 
 ID3D12Resource*
 CreateWhiteTexture() {
-	D3D12_HEAP_PROPERTIES texHeapProp = {};
-	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
-	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
-	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
-	texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
-	texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Width = 4;//幅
-	resDesc.Height = 4;//高さ
-	resDesc.DepthOrArraySize = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;//
-	resDesc.MipLevels = 1;//
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
+	
+	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4);
+	auto texHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
 
 	ID3D12Resource* whiteBuff = nullptr;
 	auto result = _dev->CreateCommittedResource(
@@ -214,24 +182,8 @@ CreateWhiteTexture() {
 
 ID3D12Resource*
 CreateBlackTexture() {
-	D3D12_HEAP_PROPERTIES texHeapProp = {};
-	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
-	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
-	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
-	texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
-	texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Width = 4;//幅
-	resDesc.Height = 4;//高さ
-	resDesc.DepthOrArraySize = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;//
-	resDesc.MipLevels = 1;//
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
+	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4);
+	auto texHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
 
 	ID3D12Resource* blackBuff = nullptr;
 	auto result = _dev->CreateCommittedResource(
@@ -282,24 +234,8 @@ LoadTextureFromFile(std::string& texPath ) {
 	auto img = scratchImg.GetImage(0, 0, 0);//生データ抽出
 
 	//WriteToSubresourceで転送する用のヒープ設定
-	D3D12_HEAP_PROPERTIES texHeapProp = {};
-	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
-	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
-	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
-	texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
-	texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = metadata.format;
-	resDesc.Width = metadata.width;//幅
-	resDesc.Height = metadata.height;//高さ
-	resDesc.DepthOrArraySize = metadata.arraySize;
-	resDesc.SampleDesc.Count = 1;//通常テクスチャなのでアンチェリしない
-	resDesc.SampleDesc.Quality = 0;//
-	resDesc.MipLevels = metadata.mipLevels;//ミップマップしないのでミップ数は１つ
-	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
+	auto texHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(metadata.format, metadata.width, metadata.height,metadata.arraySize,metadata.mipLevels);
 
 	ID3D12Resource* texbuff = nullptr;
 	result = _dev->CreateCommittedResource(
@@ -338,6 +274,7 @@ void EnableDebugLayer() {
 
 ///スワップチェイン生成関数
 HRESULT CreateSwapChain(const HWND &hwnd,IDXGIFactory6*& dxgiFactory) {
+
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
 	swapchainDesc.Width = window_width;
 	swapchainDesc.Height = window_height;
@@ -528,25 +465,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
 		return LoadFromDDSFile(path.c_str(), 0, meta, img);
 	};
-
+	
 	//深度バッファ作成
 	//深度バッファの仕様
-	D3D12_RESOURCE_DESC depthResDesc = {};
-	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;//2次元のテクスチャデータとして
-	depthResDesc.Width = window_width;//幅と高さはレンダーターゲットと同じ
-	depthResDesc.Height = window_height;//上に同じ
-	depthResDesc.DepthOrArraySize = 1;//テクスチャ配列でもないし3Dテクスチャでもない
-	depthResDesc.Format=DXGI_FORMAT_D32_FLOAT;//深度値書き込み用フォーマット
-	depthResDesc.SampleDesc.Count = 1;//サンプルは1ピクセル当たり1つ
-	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//このバッファは深度ステンシルとして使用します
-	depthResDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	depthResDesc.MipLevels = 1;
+	auto depthResDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, 
+													window_width, window_height,
+													1,1,1,0,
+													D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
 	//デプス用ヒーププロパティ
-	D3D12_HEAP_PROPERTIES depthHeapProp = {};
-	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;//DEFAULTだから後はUNKNOWNでよし
-	depthHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	depthHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	auto depthHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	//このクリアバリューが重要な意味を持つ
 	D3D12_CLEAR_VALUE _depthClearValue = {};
@@ -597,10 +525,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char signature[3];
 	PMDHeader pmdheader = {};
 	//string strModelPath = "Model/hibiki/hibiki.pmd";
-	string strModelPath = "Model/satori/satori.pmd";
+	//string strModelPath = "Model/satori/satori.pmd";
 	//string strModelPath = "Model/reimu/reimu.pmd";
 	//string strModelPath = "Model/巡音ルカ.pmd";
-	//string strModelPath = "Model/初音ミク.pmd";
+	string strModelPath = "Model/初音ミク.pmd";
 	
 	auto fp = fopen(strModelPath.c_str(), "rb");
 	fread(signature, sizeof(signature), 1, fp);
@@ -935,42 +863,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpipeline = {};
 	gpipeline.pRootSignature = nullptr;
-	gpipeline.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
-	gpipeline.VS.BytecodeLength = _vsBlob->GetBufferSize();
-	gpipeline.PS.pShaderBytecode = _psBlob->GetBufferPointer();
-	gpipeline.PS.BytecodeLength = _psBlob->GetBufferSize();
+	gpipeline.VS = CD3DX12_SHADER_BYTECODE(_vsBlob);
+	gpipeline.PS = CD3DX12_SHADER_BYTECODE(_psBlob);
 
 	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;//中身は0xffffffff
 
-	//
-	gpipeline.BlendState.AlphaToCoverageEnable = false;
-	gpipeline.BlendState.IndependentBlendEnable = false;
 
-	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
-
-	//ひとまず加算や乗算やαブレンディングは使用しない
-	renderTargetBlendDesc.BlendEnable = false;
-	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
-
-	//ひとまず論理演算は使用しない
-	renderTargetBlendDesc.LogicOpEnable = false;
+	gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	
-	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
-	
-	gpipeline.RasterizerState.MultisampleEnable = false;//まだアンチェリは使わない
+	gpipeline.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
-	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;//中身を塗りつぶす
-	gpipeline.RasterizerState.DepthClipEnable = true;//深度方向のクリッピングは有効に
-
-	gpipeline.RasterizerState.FrontCounterClockwise = false;
-	gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-	gpipeline.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-	gpipeline.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-	gpipeline.RasterizerState.AntialiasedLineEnable = false;
-	gpipeline.RasterizerState.ForcedSampleCount = 0;
-	gpipeline.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
 
 	gpipeline.DepthStencilState.DepthEnable = true;//深度バッファを使うぞ
 	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;//全て書き込み
@@ -996,7 +898,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	D3D12_DESCRIPTOR_RANGE descTblRange[3] = {};//テクスチャと定数の２つ
 
-
+	//CD3DX12_DESCRIPTOR_RANGE()
 	//定数ひとつ目(座標変換用)
 	descTblRange[0].NumDescriptors = 1;//定数ひとつ
 	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//種別は定数
