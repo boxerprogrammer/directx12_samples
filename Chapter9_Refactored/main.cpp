@@ -425,7 +425,132 @@ HRESULT CreateFinalRenderTarget(ComPtr<ID3D12DescriptorHeap>& rtvHeaps, vector<I
 	}
 }
 
+//シェーダ側に投げられるマテリアルデータ
+struct MaterialForHlsl {
+	XMFLOAT3 diffuse; //ディフューズ色
+	float alpha; // ディフューズα
+	XMFLOAT3 specular; //スペキュラ色
+	float specularity;//スペキュラの強さ(乗算値)
+	XMFLOAT3 ambient; //アンビエント色
+};
+//それ以外のマテリアルデータ
+struct AdditionalMaterial {
+	std::string texPath;//テクスチャファイルパス
+	int toonIdx; //トゥーン番号
+	bool edgeFlg;//マテリアル毎の輪郭線フラグ
+};
+//まとめたもの
+struct Material {
+	unsigned int indicesNum;//インデックス数
+	MaterialForHlsl material;
+	AdditionalMaterial additional;
+};
 
+std::vector<Material> materials;
+vector<ComPtr<ID3D12Resource>> textureResources;
+vector<ComPtr<ID3D12Resource>> sphResources;
+vector<ComPtr<ID3D12Resource>> spaResources;
+vector<ComPtr<ID3D12Resource>> toonResources;
+
+void Run() {
+	while (true) {
+		worldMat = XMMatrixRotationY(angle);
+		mapScene->world = worldMat;
+		mapScene->view = viewMat;
+		mapScene->proj = projMat;
+		angle += 0.01f;
+
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+	}
+		//もうアプリケーションが終わるって時にmessageがWM_QUITになる
+		if (msg.message == WM_QUIT) {
+			break;
+		}
+
+		//DirectX処理
+		//バックバッファのインデックスを取得
+		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+
+		_cmdList->ResourceBarrier(1,
+			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
+				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+		_cmdList->SetPipelineState(_pipelinestate.Get());
+
+
+		//レンダーターゲットを指定
+		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
+		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		//画面クリア
+
+		float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
+		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+		_cmdList->RSSetViewports(1, &viewport);
+		_cmdList->RSSetScissorRects(1, &scissorrect);
+		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
+
+		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		_cmdList->IASetVertexBuffers(0, 1, &vbView);
+		_cmdList->IASetIndexBuffer(&ibView);
+
+		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
+
+		//WVP変換行列
+		ID3D12DescriptorHeap* bdh[] = { basicDescHeap.Get() };
+		_cmdList->SetDescriptorHeaps(1, bdh);
+		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
+
+		ID3D12DescriptorHeap* mdh[] = { materialDescHeap.Get() };
+		//マテリアル
+		_cmdList->SetDescriptorHeaps(1, mdh);
+
+		auto materialH = materialDescHeap->GetGPUDescriptorHandleForHeapStart();
+		unsigned int idxOffset = 0;
+
+		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 5;
+		for (auto& m : materials) {
+			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
+			_cmdList->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
+			materialH.ptr += cbvsrvIncSize;
+			idxOffset += m.indicesNum;
+		}
+
+		_cmdList->ResourceBarrier(1,
+			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+		//命令のクローズ
+		_cmdList->Close();
+
+
+
+		//コマンドリストの実行
+		ID3D12CommandList* cmdlists[] = { _cmdList.Get() };
+		_cmdQueue->ExecuteCommandLists(1, cmdlists);
+		////待ち
+		_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
+
+		if (_fence->GetCompletedValue() != _fenceVal) {
+			auto event = CreateEvent(nullptr, false, false, nullptr);
+			_fence->SetEventOnCompletion(_fenceVal, event);
+			WaitForSingleObject(event, INFINITE);
+			CloseHandle(event);
+		}
+		_cmdAllocator->Reset();//キューをクリア
+		_cmdList->Reset(_cmdAllocator.Get(), _pipelinestate.Get());//再びコマンドリストをためる準備
+
+
+		//フリップ
+		_swapchain->Present(1, 0);
+
+}
+}
 
 #ifdef _DEBUG
 int main() {
@@ -556,26 +681,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};//70バイトのはず…でもパディングが発生するため72バイト
 #pragma pack()//1バイトパッキング解除
 
-	//シェーダ側に投げられるマテリアルデータ
-	struct MaterialForHlsl{
-		XMFLOAT3 diffuse; //ディフューズ色
-		float alpha; // ディフューズα
-		XMFLOAT3 specular; //スペキュラ色
-		float specularity;//スペキュラの強さ(乗算値)
-		XMFLOAT3 ambient; //アンビエント色
-	};
-	//それ以外のマテリアルデータ
-	struct AdditionalMaterial {
-		std::string texPath;//テクスチャファイルパス
-		int toonIdx; //トゥーン番号
-		bool edgeFlg;//マテリアル毎の輪郭線フラグ
-	};
-	//まとめたもの
-	struct Material {
-		unsigned int indicesNum;//インデックス数
-		MaterialForHlsl material;
-		AdditionalMaterial additional;
-	};
+
 
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
 	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
@@ -609,12 +715,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	unsigned int materialNum;//マテリアル数
 	fread(&materialNum, sizeof(materialNum), 1, fp);
-	std::vector<Material> materials(materialNum);
+	materials.resize(materialNum);
+	textureResources.resize(materialNum);
+	sphResources.resize(materialNum);
+	spaResources.resize(materialNum);
+	toonResources.resize(materialNum);
 
-	vector<ComPtr<ID3D12Resource>> textureResources(materialNum);
-	vector<ComPtr<ID3D12Resource>> sphResources(materialNum);
-	vector<ComPtr<ID3D12Resource>> spaResources(materialNum);
-	vector<ComPtr<ID3D12Resource>> toonResources(materialNum);
 	{
 		std::vector<PMDMaterial> pmdMaterials(materialNum);
 		fread(pmdMaterials.data(), pmdMaterials.size() * sizeof(PMDMaterial), 1, fp);
@@ -986,103 +1092,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	unsigned int frame = 0;
 	float angle = 0.0f;
 	auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-	while (true) {
-		worldMat=XMMatrixRotationY(angle);
-		mapScene->world = worldMat;
-		mapScene->view= viewMat;
-		mapScene->proj = projMat;
-		angle += 0.01f;
+	
+	Run();
 
-		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		//もうアプリケーションが終わるって時にmessageがWM_QUITになる
-		if (msg.message == WM_QUIT) {
-			break;
-		}
-
-		//DirectX処理
-		//バックバッファのインデックスを取得
-		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
-
-		_cmdList->ResourceBarrier(1,
-			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
-				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		_cmdList->SetPipelineState(_pipelinestate.Get());
-
-
-		//レンダーターゲットを指定
-		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		
-		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
-		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-		//画面クリア
-
-		float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
-		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-
-		_cmdList->RSSetViewports(1, &viewport);
-		_cmdList->RSSetScissorRects(1, &scissorrect);
-		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
-
-		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		_cmdList->IASetVertexBuffers(0, 1, &vbView);
-		_cmdList->IASetIndexBuffer(&ibView);
-
-		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
-		
-		//WVP変換行列
-		ID3D12DescriptorHeap* bdh[] = { basicDescHeap.Get() };
-		_cmdList->SetDescriptorHeaps(1, bdh);
-		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
-
-		ID3D12DescriptorHeap* mdh[] = { materialDescHeap.Get() };
-		//マテリアル
-		_cmdList->SetDescriptorHeaps(1, mdh);
-
-		auto materialH = materialDescHeap->GetGPUDescriptorHandleForHeapStart();
-		unsigned int idxOffset = 0;
-
-		auto cbvsrvIncSize= _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*5;
-		for (auto& m : materials) {
-			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
-			_cmdList->DrawIndexedInstanced(m.indicesNum, 1,idxOffset, 0, 0);
-			materialH.ptr += cbvsrvIncSize;
-			idxOffset += m.indicesNum;			
-		}
-
-		_cmdList->ResourceBarrier(1,
-			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
-				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-		//命令のクローズ
-		_cmdList->Close();
-
-
-
-		//コマンドリストの実行
-		ID3D12CommandList* cmdlists[] = { _cmdList.Get() };
-		_cmdQueue->ExecuteCommandLists(1, cmdlists);
-		////待ち
-		_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
-
-		if (_fence->GetCompletedValue() != _fenceVal) {
-			auto event = CreateEvent(nullptr, false, false, nullptr);
-			_fence->SetEventOnCompletion(_fenceVal, event);
-			WaitForSingleObject(event, INFINITE);
-			CloseHandle(event);
-		}
-		_cmdAllocator->Reset();//キューをクリア
-		_cmdList->Reset(_cmdAllocator.Get(), _pipelinestate.Get());//再びコマンドリストをためる準備
-
-
-		//フリップ
-		_swapchain->Present(1, 0);
-
-	}
 	//もうクラス使わんから登録解除してや
 	UnregisterClass(windowClass.lpszClassName, windowClass.hInstance);
 	return 0;
