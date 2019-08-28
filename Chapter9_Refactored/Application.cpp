@@ -210,7 +210,7 @@ Application::LoadTextureFromFile(std::string& texPath) {
 	ScratchImage scratchImg = {};
 	auto wtexpath = GetWideStringFromString(texPath);//テクスチャのファイルパス
 	auto ext = GetExtension(texPath);//拡張子を取得
-	auto result = loadLambdaTable[ext](wtexpath,
+	auto result = _loadLambdaTable[ext](wtexpath,
 		&metadata,
 		scratchImg);
 	if (FAILED(result)) {
@@ -411,8 +411,8 @@ Application::CreateFinalRenderTarget(ComPtr<ID3D12DescriptorHeap>& rtvHeaps, vec
 		_dev->CreateRenderTargetView(backBuffers[i], &rtvDesc, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
-	viewport = CD3DX12_VIEWPORT(backBuffers[0]);
-	scissorrect = CD3DX12_RECT(0, 0, window_width, window_height);
+	_viewport = CD3DX12_VIEWPORT(backBuffers[0]);
+	_scissorrect = CD3DX12_RECT(0, 0, window_width, window_height);
 	return result;
 }
 
@@ -467,7 +467,7 @@ Application::CreateBasicGraphicsPipeline() {
 	};
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpipeline = {};
-	gpipeline.pRootSignature = rootsignature.Get();
+	gpipeline.pRootSignature = _rootsignature.Get();
 	gpipeline.VS = CD3DX12_SHADER_BYTECODE(_vsBlob.Get());
 	gpipeline.PS = CD3DX12_SHADER_BYTECODE(_psBlob.Get());
 
@@ -534,7 +534,7 @@ Application::CreateRootSignature() {
 		assert(0);
 		return result;
 	}
-	result = _dev->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(rootsignature.ReleaseAndGetAddressOf()));
+	result = _dev->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(_rootsignature.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		assert(0);
 		return result;
@@ -546,16 +546,16 @@ Application::CreateRootSignature() {
 
 void 
 Application::Run() {
-	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
+	ShowWindow(_hwnd, SW_SHOW);//ウィンドウ表示
 	float angle = 0.0f;
 	MSG msg = {};
 	unsigned int frame = 0;
-	auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
 	while (true) {
-		worldMat = XMMatrixRotationY(angle);
-		mapScene->world = worldMat;
-		mapScene->view = viewMat;
-		mapScene->proj = projMat;
+		_worldMat = XMMatrixRotationY(angle);
+		_mapScene->world = _worldMat;
+		_mapScene->view = _viewMat;
+		_mapScene->proj = _projMat;
 		angle += 0.01f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -579,7 +579,7 @@ Application::Run() {
 
 
 		//レンダーターゲットを指定
-		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+		auto rtvH = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
@@ -589,30 +589,30 @@ Application::Run() {
 		float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
-		_cmdList->RSSetViewports(1, &viewport);
-		_cmdList->RSSetScissorRects(1, &scissorrect);
-		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
+		_cmdList->RSSetViewports(1, &_viewport);
+		_cmdList->RSSetScissorRects(1, &_scissorrect);
+		_cmdList->SetGraphicsRootSignature(_rootsignature.Get());
 
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		_cmdList->IASetVertexBuffers(0, 1, &vbView);
-		_cmdList->IASetIndexBuffer(&ibView);
+		_cmdList->IASetVertexBuffers(0, 1, &_vbView);
+		_cmdList->IASetIndexBuffer(&_ibView);
 
-		_cmdList->SetGraphicsRootSignature(rootsignature.Get());
+		_cmdList->SetGraphicsRootSignature(_rootsignature.Get());
 
 		//WVP変換行列
-		ID3D12DescriptorHeap* bdh[] = { basicDescHeap.Get() };
+		ID3D12DescriptorHeap* bdh[] = { _basicDescHeap.Get() };
 		_cmdList->SetDescriptorHeaps(1, bdh);
-		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
+		_cmdList->SetGraphicsRootDescriptorTable(0, _basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-		ID3D12DescriptorHeap* mdh[] = { materialDescHeap.Get() };
+		ID3D12DescriptorHeap* mdh[] = { _materialDescHeap.Get() };
 		//マテリアル
 		_cmdList->SetDescriptorHeaps(1, mdh);
 
-		auto materialH = materialDescHeap->GetGPUDescriptorHandleForHeapStart();
+		auto materialH = _materialDescHeap->GetGPUDescriptorHandleForHeapStart();
 		unsigned int idxOffset = 0;
 
 		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 5;
-		for (auto& m : materials) {
+		for (auto& m : _materials) {
 			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
 			_cmdList->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
 			materialH.ptr += cbvsrvIncSize;
@@ -652,15 +652,15 @@ Application::Run() {
 
 void 
 Application::CreateTextureLoaderTable() {
-	loadLambdaTable["sph"] = loadLambdaTable["spa"] = loadLambdaTable["bmp"] = loadLambdaTable["png"] = loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+	_loadLambdaTable["sph"] = _loadLambdaTable["spa"] = _loadLambdaTable["bmp"] = _loadLambdaTable["png"] = _loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
 		return LoadFromWICFile(path.c_str(), 0, meta, img);
 	};
 
-	loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+	_loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
 		return LoadFromTGAFile(path.c_str(), meta, img);
 	};
 
-	loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+	_loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
 		return LoadFromDDSFile(path.c_str(), 0, meta, img);
 	};
 }
@@ -688,7 +688,7 @@ Application::CreateDepthStencilView() {
 		&depthResDesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, //デプス書き込みに使用
 		&depthClearValue,
-		IID_PPV_ARGS(depthBuffer.ReleaseAndGetAddressOf()));
+		IID_PPV_ARGS(_depthBuffer.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		//エラー処理
 		return result;
@@ -701,14 +701,14 @@ Application::CreateDepthStencilView() {
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
 
-	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf()));
+	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(_dsvHeap.ReleaseAndGetAddressOf()));
 
 	//深度ビュー作成
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;//デプス値に32bit使用
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;//フラグは特になし
-	_dev->CreateDepthStencilView(depthBuffer.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	_dev->CreateDepthStencilView(_depthBuffer.Get(), &dsvDesc, _dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
 }
 
@@ -768,17 +768,17 @@ Application::LoadPMDFile(const char* path) {
 		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(vertBuff.ReleaseAndGetAddressOf()));
+		IID_PPV_ARGS(_vertBuff.ReleaseAndGetAddressOf()));
 
 	unsigned char* vertMap = nullptr;
-	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
+	result = _vertBuff->Map(0, nullptr, (void**)&vertMap);
 	std::copy(vertices.begin(), vertices.end(), vertMap);
-	vertBuff->Unmap(0, nullptr);
+	_vertBuff->Unmap(0, nullptr);
 
 
-	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
-	vbView.SizeInBytes = vertices.size();//全バイト数
-	vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
+	_vbView.BufferLocation = _vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
+	_vbView.SizeInBytes = vertices.size();//全バイト数
+	_vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
 
 	std::vector<unsigned short> indices(indicesNum);
 	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);//一気に読み込み
@@ -792,39 +792,39 @@ Application::LoadPMDFile(const char* path) {
 		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(idxBuff.ReleaseAndGetAddressOf()));
+		IID_PPV_ARGS(_idxBuff.ReleaseAndGetAddressOf()));
 
 	//作ったバッファにインデックスデータをコピー
 	unsigned short* mappedIdx = nullptr;
-	idxBuff->Map(0, nullptr, (void**)&mappedIdx);
+	_idxBuff->Map(0, nullptr, (void**)&mappedIdx);
 	std::copy(indices.begin(), indices.end(), mappedIdx);
-	idxBuff->Unmap(0, nullptr);
+	_idxBuff->Unmap(0, nullptr);
 
 
 	//インデックスバッファビューを作成
-	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
-	ibView.Format = DXGI_FORMAT_R16_UINT;
-	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
+	_ibView.BufferLocation = _idxBuff->GetGPUVirtualAddress();
+	_ibView.Format = DXGI_FORMAT_R16_UINT;
+	_ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
 
 
-	fread(&materialNum, sizeof(materialNum), 1, fp);
-	materials.resize(materialNum);
-	textureResources.resize(materialNum);
-	sphResources.resize(materialNum);
-	spaResources.resize(materialNum);
-	toonResources.resize(materialNum);
+	fread(&_materialNum, sizeof(_materialNum), 1, fp);
+	_materials.resize(_materialNum);
+	_textureResources.resize(_materialNum);
+	_sphResources.resize(_materialNum);
+	_spaResources.resize(_materialNum);
+	_toonResources.resize(_materialNum);
 
-	std::vector<PMDMaterial> pmdMaterials(materialNum);
+	std::vector<PMDMaterial> pmdMaterials(_materialNum);
 	fread(pmdMaterials.data(), pmdMaterials.size() * sizeof(PMDMaterial), 1, fp);
 	//コピー
 	for (int i = 0; i < pmdMaterials.size(); ++i) {
-		materials[i].indicesNum = pmdMaterials[i].indicesNum;
-		materials[i].material.diffuse = pmdMaterials[i].diffuse;
-		materials[i].material.alpha = pmdMaterials[i].alpha;
-		materials[i].material.specular = pmdMaterials[i].specular;
-		materials[i].material.specularity = pmdMaterials[i].specularity;
-		materials[i].material.ambient = pmdMaterials[i].ambient;
-		materials[i].additional.toonIdx = pmdMaterials[i].toonIdx;
+		_materials[i].indicesNum = pmdMaterials[i].indicesNum;
+		_materials[i].material.diffuse = pmdMaterials[i].diffuse;
+		_materials[i].material.alpha = pmdMaterials[i].alpha;
+		_materials[i].material.specular = pmdMaterials[i].specular;
+		_materials[i].material.specularity = pmdMaterials[i].specularity;
+		_materials[i].material.ambient = pmdMaterials[i].ambient;
+		_materials[i].additional.toonIdx = pmdMaterials[i].toonIdx;
 	}
 
 	for (int i = 0; i < pmdMaterials.size(); ++i) {
@@ -833,10 +833,10 @@ Application::LoadPMDFile(const char* path) {
 		char toonFileName[16];
 		sprintf(toonFileName, "toon%02d.bmp", pmdMaterials[i].toonIdx + 1);
 		toonFilePath += toonFileName;
-		toonResources[i] = LoadTextureFromFile(toonFilePath);
+		_toonResources[i] = LoadTextureFromFile(toonFilePath);
 
 		if (strlen(pmdMaterials[i].texFilePath) == 0) {
-			textureResources[i] = nullptr;
+			_textureResources[i] = nullptr;
 			continue;
 		}
 
@@ -879,15 +879,15 @@ Application::LoadPMDFile(const char* path) {
 		//モデルとテクスチャパスからアプリケーションからのテクスチャパスを得る
 		if (texFileName != "") {
 			auto texFilePath = GetTexturePathFromModelAndTexPath(strModelPath, texFileName.c_str());
-			textureResources[i] = LoadTextureFromFile(texFilePath);
+			_textureResources[i] = LoadTextureFromFile(texFilePath);
 		}
 		if (sphFileName != "") {
 			auto sphFilePath = GetTexturePathFromModelAndTexPath(strModelPath, sphFileName.c_str());
-			sphResources[i] = LoadTextureFromFile(sphFilePath);
+			_sphResources[i] = LoadTextureFromFile(sphFilePath);
 		}
 		if (spaFileName != "") {
 			auto spaFilePath = GetTexturePathFromModelAndTexPath(strModelPath, spaFileName.c_str());
-			spaResources[i] = LoadTextureFromFile(spaFilePath);
+			_spaResources[i] = LoadTextureFromFile(spaFilePath);
 		}
 
 
@@ -903,10 +903,10 @@ Application::CreateMaterialData() {
 	auto result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize*materialNum),//勿体ないけど仕方ないですね
+		&CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize*_materialNum),//勿体ないけど仕方ないですね
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(materialBuff.ReleaseAndGetAddressOf())
+		IID_PPV_ARGS(_materialBuff.ReleaseAndGetAddressOf())
 	);
 	if (FAILED(result)) {
 		assert(0);
@@ -915,31 +915,31 @@ Application::CreateMaterialData() {
 
 	//マップマテリアルにコピー
 	char* mapMaterial = nullptr;
-	result = materialBuff->Map(0, nullptr, (void**)&mapMaterial);
+	result = _materialBuff->Map(0, nullptr, (void**)&mapMaterial);
 	if (FAILED(result)) {
 		assert(0);
 		return result;
 	}
-	for (auto& m : materials) {
+	for (auto& m : _materials) {
 		*((MaterialForHlsl*)mapMaterial) = m.material;//データコピー
 		mapMaterial += materialBuffSize;//次のアライメント位置まで進める
 	}
-	materialBuff->Unmap(0, nullptr);
+	_materialBuff->Unmap(0, nullptr);
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC materialDescHeapDesc = {};
-	materialDescHeapDesc.NumDescriptors = materialNum * 5;//マテリアル数ぶん(定数1つ、テクスチャ3つ)
+	materialDescHeapDesc.NumDescriptors = _materialNum * 5;//マテリアル数ぶん(定数1つ、テクスチャ3つ)
 	materialDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	materialDescHeapDesc.NodeMask = 0;
 
 	materialDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
-	result = _dev->CreateDescriptorHeap(&materialDescHeapDesc, IID_PPV_ARGS(materialDescHeap.ReleaseAndGetAddressOf()));//生成
+	result = _dev->CreateDescriptorHeap(&materialDescHeapDesc, IID_PPV_ARGS(_materialDescHeap.ReleaseAndGetAddressOf()));//生成
 	if (FAILED(result)) {
 		assert(0);
 		return result;
 	}
 
-	matCBVDesc.BufferLocation = materialBuff->GetGPUVirtualAddress();
+	matCBVDesc.BufferLocation = _materialBuff->GetGPUVirtualAddress();
 	matCBVDesc.SizeInBytes = materialBuffSize;
 	return result;
 }
@@ -947,12 +947,12 @@ Application::CreateMaterialData() {
 HRESULT 
 Application::CreateSceneTransformView() {
 	//定数バッファ作成
-	worldMat = XMMatrixIdentity();
+	_worldMat = XMMatrixIdentity();
 	XMFLOAT3 eye(0, 15, -15);
 	XMFLOAT3 target(0, 15, 0);
 	XMFLOAT3 up(0, 1, 0);
-	viewMat = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
-	projMat = XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
+	_viewMat = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+	_projMat = XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
 		static_cast<float>(window_width) / static_cast<float>(window_height),//アス比
 		1.0f,//近い方
 		100.0f//遠い方
@@ -964,7 +964,7 @@ Application::CreateSceneTransformView() {
 		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneData) + 0xff)&~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(constBuff.ReleaseAndGetAddressOf())
+		IID_PPV_ARGS(_constBuff.ReleaseAndGetAddressOf())
 	);
 
 	if (FAILED(result)) {
@@ -972,26 +972,26 @@ Application::CreateSceneTransformView() {
 		return result;
 	}
 
-	mapScene = nullptr;//マップ先を示すポインタ
-	result = constBuff->Map(0, nullptr, (void**)&mapScene);//マップ
+	_mapScene = nullptr;//マップ先を示すポインタ
+	result = _constBuff->Map(0, nullptr, (void**)&_mapScene);//マップ
 	//行列の内容をコピー
-	mapScene->world = worldMat;
-	mapScene->view = viewMat;
-	mapScene->proj = projMat;
-	mapScene->eye = eye;
+	_mapScene->world = _worldMat;
+	_mapScene->view = _viewMat;
+	_mapScene->proj = _projMat;
+	_mapScene->eye = eye;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//シェーダから見えるように
 	descHeapDesc.NodeMask = 0;//マスクは0
 	descHeapDesc.NumDescriptors = 1;//
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
-	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(basicDescHeap.ReleaseAndGetAddressOf()));//生成
+	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_basicDescHeap.ReleaseAndGetAddressOf()));//生成
 
 	////デスクリプタの先頭ハンドルを取得しておく
-	auto basicHeapHandle = basicDescHeap->GetCPUDescriptorHandleForHeapStart();
+	auto basicHeapHandle = _basicDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+	cbvDesc.BufferLocation = _constBuff->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = _constBuff->GetDesc().Width;
 	//定数バッファビューの作成
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 	return result;
@@ -1004,51 +1004,51 @@ Application::CreateMaterialAndTextureView() {
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;//後述
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc.Texture2D.MipLevels = 1;//ミップマップは使用しないので1
-	CD3DX12_CPU_DESCRIPTOR_HANDLE matDescHeapH(materialDescHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE matDescHeapH(_materialDescHeap->GetCPUDescriptorHandleForHeapStart());
 	auto incSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for (int i = 0; i < materialNum; ++i) {
+	for (int i = 0; i < _materialNum; ++i) {
 		//マテリアル固定バッファビュー
 		_dev->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
 		matDescHeapH.ptr += incSize;
 		matCBVDesc.BufferLocation += materialBuffSize;
-		if (textureResources[i] == nullptr) {
-			srvDesc.Format = whiteTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(whiteTex.Get(), &srvDesc, matDescHeapH);
+		if (_textureResources[i] == nullptr) {
+			srvDesc.Format = _whiteTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(_whiteTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
-			srvDesc.Format = textureResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(textureResources[i].Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _textureResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(_textureResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.Offset(incSize);
 
-		if (sphResources[i] == nullptr) {
-			srvDesc.Format = whiteTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(whiteTex.Get(), &srvDesc, matDescHeapH);
+		if (_sphResources[i] == nullptr) {
+			srvDesc.Format = _whiteTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(_whiteTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
-			srvDesc.Format = sphResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(sphResources[i].Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _sphResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(_sphResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 
-		if (spaResources[i] == nullptr) {
-			srvDesc.Format = blackTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(blackTex.Get(), &srvDesc, matDescHeapH);
+		if (_spaResources[i] == nullptr) {
+			srvDesc.Format = _blackTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(_blackTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
-			srvDesc.Format = spaResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(spaResources[i].Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _spaResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(_spaResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 
 
-		if (toonResources[i] == nullptr) {
-			srvDesc.Format = gradTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(gradTex.Get(), &srvDesc, matDescHeapH);
+		if (_toonResources[i] == nullptr) {
+			srvDesc.Format = _gradTex->GetDesc().Format;
+			_dev->CreateShaderResourceView(_gradTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
-			srvDesc.Format = toonResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(toonResources[i].Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _toonResources[i]->GetDesc().Format;
+			_dev->CreateShaderResourceView(_toonResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 	}
@@ -1057,7 +1057,7 @@ Application::CreateMaterialAndTextureView() {
 bool 
 Application::Init() {
 	auto result = CoInitializeEx(0, COINIT_MULTITHREADED);
-	CreateGameWindow(hwnd, windowClass);
+	CreateGameWindow(_hwnd, _windowClass);
 #ifdef _DEBUG
 	//デバッグレイヤーをオンに
 	EnableDebugLayer();
@@ -1072,11 +1072,11 @@ Application::Init() {
 		assert(0);
 		return false;
 	}
-	if (FAILED(CreateSwapChain(hwnd, _dxgiFactory))) {
+	if (FAILED(CreateSwapChain(_hwnd, _dxgiFactory))) {
 		assert(0);
 		return false;
 	}
-	if (FAILED(CreateFinalRenderTarget(rtvHeaps, _backBuffers))) {
+	if (FAILED(CreateFinalRenderTarget(_rtvHeaps, _backBuffers))) {
 		assert(0);
 		return false;
 	}
@@ -1098,9 +1098,9 @@ Application::Init() {
 	}
 
 
-	whiteTex = CreateWhiteTexture();
-	blackTex = CreateBlackTexture();
-	gradTex = CreateGrayGradationTexture();
+	_whiteTex = CreateWhiteTexture();
+	_blackTex = CreateBlackTexture();
+	_gradTex = CreateGrayGradationTexture();
 
 	//LoadPMDFile("Model/hibiki/hibiki.pmd");
 	//LoadPMDFile("Model/satori/satori.pmd");
@@ -1139,7 +1139,7 @@ Application::Init() {
 void
 Application::Terminate() {
 	//もうクラス使わんから登録解除してや
-	UnregisterClass(windowClass.lpszClassName, windowClass.hInstance);
+	UnregisterClass(_windowClass.lpszClassName, _windowClass.hInstance);
 }
 
 

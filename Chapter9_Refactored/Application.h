@@ -17,8 +17,8 @@ class Application
 private:
 	//ここに必要な変数(バッファやヒープなど)を書く
 	//ウィンドウ周り
-	WNDCLASSEX windowClass;
-	HWND hwnd;
+	WNDCLASSEX _windowClass;
+	HWND _hwnd;
 	//DXGIまわり
 	Microsoft::WRL::ComPtr < IDXGIFactory6> _dxgiFactory = nullptr;//DXGIインターフェイス
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> _swapchain = nullptr;//スワップチェイン
@@ -30,29 +30,29 @@ private:
 	Microsoft::WRL::ComPtr < ID3D12CommandQueue> _cmdQueue = nullptr;//コマンドキュー
 
 	//必要最低限のバッファまわり
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertBuff = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> idxBuff = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> constBuff = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _depthBuffer = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _vertBuff = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _idxBuff = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _constBuff = nullptr;
 
 	//ロード用テーブル
 	using LoadLambda_t = std::function<HRESULT(const std::wstring& path, DirectX::TexMetadata*, DirectX::ScratchImage&)>;
-	std::map < std::string, LoadLambda_t> loadLambdaTable;
+	std::map < std::string, LoadLambda_t> _loadLambdaTable;
 
 	//マテリアル周り
-	unsigned int materialNum;//マテリアル数
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialBuff = nullptr;
+	unsigned int _materialNum;//マテリアル数
+	Microsoft::WRL::ComPtr<ID3D12Resource> _materialBuff = nullptr;
 	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
 
 	//デフォルトのテクスチャ(白、黒、グレイスケールグラデーション)
-	Microsoft::WRL::ComPtr<ID3D12Resource> whiteTex = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> blackTex = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> gradTex = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _whiteTex = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _blackTex = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _gradTex = nullptr;
 
 	//座標変換系行列
-	DirectX::XMMATRIX worldMat;
-	DirectX::XMMATRIX viewMat;
-	DirectX::XMMATRIX projMat;
+	DirectX::XMMATRIX _worldMat;
+	DirectX::XMMATRIX _viewMat;
+	DirectX::XMMATRIX _projMat;
 
 	//シェーダ側に投げられるマテリアルデータ
 	struct MaterialForHlsl {
@@ -74,11 +74,11 @@ private:
 		MaterialForHlsl material;
 		AdditionalMaterial additional;
 	};
-	std::vector<Material> materials;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> textureResources;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> sphResources;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> spaResources;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> toonResources;
+	std::vector<Material> _materials;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> _textureResources;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> _sphResources;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> _spaResources;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> _toonResources;
 
 	//シェーダ側に渡すための基本的な環境データ
 	struct SceneData {
@@ -87,29 +87,29 @@ private:
 		DirectX::XMMATRIX proj;//
 		DirectX::XMFLOAT3 eye;//視点座標
 	};
-	SceneData* mapScene;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> basicDescHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> materialDescHeap = nullptr;
+	SceneData* _mapScene;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _basicDescHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _materialDescHeap = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D12Fence> _fence = nullptr;
 	UINT64 _fenceVal = 0;
 
 	//頂点＆インデックスバッファビュー
-	D3D12_VERTEX_BUFFER_VIEW vbView = {};
-	D3D12_INDEX_BUFFER_VIEW ibView = {};
+	D3D12_VERTEX_BUFFER_VIEW _vbView = {};
+	D3D12_INDEX_BUFFER_VIEW _ibView = {};
 
 	//ファイル名パスとリソースのマップテーブル
 	std::map<std::string, ID3D12Resource*> _resourceTable;
 
 	//パイプライン＆ルートシグネチャ
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelinestate = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootsignature = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootsignature = nullptr;
 
 	std::vector<ID3D12Resource*> _backBuffers;//バックバッファ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvHeaps = nullptr;//レンダーターゲット用デスクリプタヒープ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;//深度バッファビュー用デスクリプタヒープ
-	CD3DX12_VIEWPORT viewport;//ビューポート
-	CD3DX12_RECT scissorrect;//シザー矩形
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;//レンダーターゲット用デスクリプタヒープ
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;//深度バッファビュー用デスクリプタヒープ
+	CD3DX12_VIEWPORT _viewport;//ビューポート
+	CD3DX12_RECT _scissorrect;//シザー矩形
 
 	//テクスチャバッファ周り
 	ID3D12Resource* CreateWhiteTexture();//白テクスチャの生成
