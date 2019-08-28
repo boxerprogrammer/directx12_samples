@@ -50,11 +50,74 @@ const unsigned int window_width = 1280;
 const unsigned int window_height = 720;
 
 ComPtr < IDXGIFactory6> _dxgiFactory = nullptr;
-ComPtr<ID3D12Device> _dev = nullptr;
+ComPtr< ID3D12Device> _dev = nullptr;
 ComPtr < ID3D12CommandAllocator> _cmdAllocator = nullptr;
 ComPtr < ID3D12GraphicsCommandList> _cmdList = nullptr;
 ComPtr < ID3D12CommandQueue> _cmdQueue = nullptr;
 ComPtr < IDXGISwapChain4> _swapchain = nullptr;
+
+using LoadLambda_t = function<HRESULT(const wstring& path, TexMetadata*, ScratchImage&)>;
+map < string, LoadLambda_t> loadLambdaTable;
+
+XMMATRIX worldMat;
+XMMATRIX viewMat;
+XMMATRIX projMat;
+//シェーダ側に投げられるマテリアルデータ
+struct MaterialForHlsl {
+	XMFLOAT3 diffuse; //ディフューズ色
+	float alpha; // ディフューズα
+	XMFLOAT3 specular; //スペキュラ色
+	float specularity;//スペキュラの強さ(乗算値)
+	XMFLOAT3 ambient; //アンビエント色
+};
+//それ以外のマテリアルデータ
+struct AdditionalMaterial {
+	std::string texPath;//テクスチャファイルパス
+	int toonIdx; //トゥーン番号
+	bool edgeFlg;//マテリアル毎の輪郭線フラグ
+};
+//まとめたもの
+struct Material {
+	unsigned int indicesNum;//インデックス数
+	MaterialForHlsl material;
+	AdditionalMaterial additional;
+};
+std::vector<Material> materials;
+vector<ComPtr<ID3D12Resource>> textureResources;
+vector<ComPtr<ID3D12Resource>> sphResources;
+vector<ComPtr<ID3D12Resource>> spaResources;
+vector<ComPtr<ID3D12Resource>> toonResources;
+
+//シェーダ側に渡すための基本的な環境データ
+struct SceneData {
+	XMMATRIX world;//ワールド行列
+	XMMATRIX view;//ビュープロジェクション行列
+	XMMATRIX proj;//
+	XMFLOAT3 eye;//視点座標
+};
+SceneData* mapScene;
+ComPtr<ID3D12DescriptorHeap> basicDescHeap = nullptr;
+ComPtr<ID3D12DescriptorHeap> materialDescHeap = nullptr;
+
+ComPtr<ID3D12Fence> _fence = nullptr;
+UINT64 _fenceVal = 0;
+
+
+D3D12_VERTEX_BUFFER_VIEW vbView = {};
+D3D12_INDEX_BUFFER_VIEW ibView = {};
+
+//ファイル名パスとリソースのマップテーブル
+map<string, ID3D12Resource*> _resourceTable;
+
+std::vector<ID3D12Resource*> _backBuffers;
+ComPtr<ID3D12DescriptorHeap> rtvHeaps = nullptr;
+ComPtr<ID3D12PipelineState> _pipelinestate = nullptr;
+
+ComPtr<ID3D12RootSignature> rootsignature = nullptr;
+
+ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;
+CD3DX12_VIEWPORT viewport;
+CD3DX12_RECT scissorrect(0, 0, window_width, window_height);
 
 ///モデルのパスとテクスチャのパスから合成パスを得る
 ///@param modelPath アプリケーションから見たpmdモデルのパス
@@ -205,12 +268,7 @@ CreateBlackTexture() {
 	result = blackBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, data.size());
 	return blackBuff;
 }
-using LoadLambda_t = function<HRESULT(const wstring& path, TexMetadata*, ScratchImage&)>;
-map < string, LoadLambda_t> loadLambdaTable;
 
-
-//ファイル名パスとリソースのマップテーブル
-map<string, ID3D12Resource*> _resourceTable;
 
 ID3D12Resource*
 LoadTextureFromFile(std::string& texPath ) {
@@ -423,36 +481,17 @@ HRESULT CreateFinalRenderTarget(ComPtr<ID3D12DescriptorHeap>& rtvHeaps, vector<I
 		_dev->CreateRenderTargetView(backBuffers[i], &rtvDesc, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
+	viewport = CD3DX12_VIEWPORT(backBuffers[0]);
 }
 
-//シェーダ側に投げられるマテリアルデータ
-struct MaterialForHlsl {
-	XMFLOAT3 diffuse; //ディフューズ色
-	float alpha; // ディフューズα
-	XMFLOAT3 specular; //スペキュラ色
-	float specularity;//スペキュラの強さ(乗算値)
-	XMFLOAT3 ambient; //アンビエント色
-};
-//それ以外のマテリアルデータ
-struct AdditionalMaterial {
-	std::string texPath;//テクスチャファイルパス
-	int toonIdx; //トゥーン番号
-	bool edgeFlg;//マテリアル毎の輪郭線フラグ
-};
-//まとめたもの
-struct Material {
-	unsigned int indicesNum;//インデックス数
-	MaterialForHlsl material;
-	AdditionalMaterial additional;
-};
 
-std::vector<Material> materials;
-vector<ComPtr<ID3D12Resource>> textureResources;
-vector<ComPtr<ID3D12Resource>> sphResources;
-vector<ComPtr<ID3D12Resource>> spaResources;
-vector<ComPtr<ID3D12Resource>> toonResources;
+
+
 
 void Run() {
+	float angle = 0.0f;
+	MSG msg = {};
+	auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
 	while (true) {
 		worldMat = XMMatrixRotationY(angle);
 		mapScene->world = worldMat;
@@ -549,7 +588,67 @@ void Run() {
 		//フリップ
 		_swapchain->Present(1, 0);
 
+	}
 }
+
+void CreateTextureLoaderTable() {
+	loadLambdaTable["sph"] = loadLambdaTable["spa"] = loadLambdaTable["bmp"] = loadLambdaTable["png"] = loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromWICFile(path.c_str(), 0, meta, img);
+	};
+
+	loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromTGAFile(path.c_str(), meta, img);
+	};
+
+	loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
+		return LoadFromDDSFile(path.c_str(), 0, meta, img);
+	};
+}
+
+HRESULT CreateDepthStencilView() {
+	//深度バッファ作成
+	//深度バッファの仕様
+	auto depthResDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT,
+		window_width, window_height,
+		1, 1, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+	//デプス用ヒーププロパティ
+	auto depthHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	CD3DX12_CLEAR_VALUE depthClearValue(DXGI_FORMAT_D32_FLOAT, 1.0f, 0);
+
+	float clrColor[4] = { 1.0f,1.0f,1.0f,1.0f };
+	CD3DX12_CLEAR_VALUE rtClearValue(DXGI_FORMAT_R8G8B8A8_UINT, clrColor);
+	ComPtr<ID3D12Resource> depthBuffer = nullptr;
+	auto result = _dev->CreateCommittedResource(
+		&depthHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&depthResDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE, //デプス書き込みに使用
+		&depthClearValue,
+		IID_PPV_ARGS(depthBuffer.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		//エラー処理
+		return result;
+	}
+
+	//深度のためのデスクリプタヒープ作成
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};//深度に使うよという事がわかればいい
+	dsvHeapDesc.NumDescriptors = 1;//深度ビュー1つのみ
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;//デプスステンシルビューとして使う
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+
+	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf()));
+
+	//深度ビュー作成
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;//デプス値に32bit使用
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2Dテクスチャ
+	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;//フラグは特になし
+	_dev->CreateDepthStencilView(depthBuffer.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
 }
 
 #ifdef _DEBUG
@@ -568,73 +667,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//デバッグレイヤーをオンに
 	EnableDebugLayer();
 #endif
+	//DirectX12関連初期化
 	HRESULT result = InitializeDXGIDevice();
+	if (FAILED(InitializeCommand())) {
+		return 0;
+	}
+	if (FAILED(CreateSwapChain(hwnd, _dxgiFactory))) {
+		return 0;
+	}
+	if (FAILED(CreateFinalRenderTarget(rtvHeaps, _backBuffers))) {
+		return 0;
+	}
 
-	result = InitializeCommand();
+	//テクスチャローダー関連初期化
+	CreateTextureLoaderTable();
 
-	result = CreateSwapChain(hwnd, _dxgiFactory);
-
-	std::vector<ID3D12Resource*> _backBuffers;
-	ComPtr<ID3D12DescriptorHeap> rtvHeaps = nullptr;
-
-	result = CreateFinalRenderTarget(rtvHeaps, _backBuffers);
-
-
-
-	loadLambdaTable["sph"] = loadLambdaTable["spa"] = loadLambdaTable["bmp"] = loadLambdaTable["png"] = loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
-		return LoadFromWICFile(path.c_str(), 0, meta, img);
-	};
-
-	loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
-		return LoadFromTGAFile(path.c_str(), meta, img);
-	};
-
-	loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
-		return LoadFromDDSFile(path.c_str(), 0, meta, img);
-	};
 	
 	//深度バッファ作成
-	//深度バッファの仕様
-	auto depthResDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, 
-													window_width, window_height,
-													1,1,1,0,
-													D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+	if (FAILED(CreateDepthStencilView())) {
+		return 0;
+	}
 
-	//デプス用ヒーププロパティ
-	auto depthHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-	CD3DX12_CLEAR_VALUE depthClearValue(DXGI_FORMAT_D32_FLOAT, 1.0f, 0);
-
-	float clrColor[4] = { 1.0f,1.0f,1.0f,1.0f };
-	CD3DX12_CLEAR_VALUE rtClearValue(DXGI_FORMAT_R8G8B8A8_UINT,clrColor);
-	ComPtr<ID3D12Resource> depthBuffer = nullptr;
-	result = _dev->CreateCommittedResource(
-		&depthHeapProp,
-		D3D12_HEAP_FLAG_NONE,
-		&depthResDesc,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, //デプス書き込みに使用
-		&depthClearValue,
-		IID_PPV_ARGS(depthBuffer.ReleaseAndGetAddressOf()));
-
-	//深度のためのデスクリプタヒープ作成
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};//深度に使うよという事がわかればいい
-	dsvHeapDesc.NumDescriptors = 1;//深度ビュー1つのみ
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;//デプスステンシルビューとして使う
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;
-	
-	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf()));
-
-	//深度ビュー作成
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;//デプス値に32bit使用
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;//フラグは特になし
-	_dev->CreateDepthStencilView(depthBuffer.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
-
-
-	ComPtr<ID3D12Fence> _fence = nullptr;
-	UINT64 _fenceVal = 0;
+	//フェンスの作成
 	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf()));
 
 	ShowWindow(hwnd, SW_SHOW);//ウィンドウ表示
@@ -658,6 +712,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	string strModelPath = "Model/初音ミク.pmd";
 	
 	auto fp = fopen(strModelPath.c_str(), "rb");
+	if (fp == nullptr) {
+		//エラー処理
+		assert(0);
+		return 0;
+	}
 	fread(signature, sizeof(signature), 1, fp);
 	fread(&pmdheader, sizeof(pmdheader), 1, fp);
 
@@ -705,7 +764,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::copy(vertices.begin(), vertices.end(), vertMap);
 	vertBuff->Unmap(0, nullptr);
 
-	D3D12_VERTEX_BUFFER_VIEW vbView = {};
+	
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
 	vbView.SizeInBytes = vertices.size();//全バイト数
 	vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
@@ -824,7 +883,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	idxBuff->Unmap(0, nullptr);
 
 	//インデックスバッファビューを作成
-	D3D12_INDEX_BUFFER_VIEW ibView = {};
+
 	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
 	ibView.Format = DXGI_FORMAT_R16_UINT;
 	ibView.SizeInBytes = indices.size()*sizeof(indices[0]);
@@ -852,7 +911,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialBuff->Unmap(0,nullptr);
 
 
-	ComPtr<ID3D12DescriptorHeap> materialDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC materialDescHeapDesc = {};
 	materialDescHeapDesc.NumDescriptors = materialNum * 5;//マテリアル数ぶん(定数1つ、テクスチャ3つ)
 	materialDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -999,7 +1057,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	gpipeline.SampleDesc.Count = 1;//サンプリングは1ピクセルにつき１
 	gpipeline.SampleDesc.Quality = 0;//クオリティは最低
 
-	ComPtr<ID3D12RootSignature> rootsignature = nullptr;
+	
 	
 
 	//レンジ
@@ -1028,28 +1086,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootSigBlob->Release();
 
 	gpipeline.pRootSignature = rootsignature.Get();
-	ComPtr<ID3D12PipelineState> _pipelinestate = nullptr;
+	
 	result = _dev->CreateGraphicsPipelineState(&gpipeline, IID_PPV_ARGS(_pipelinestate.ReleaseAndGetAddressOf()));
-
-	CD3DX12_VIEWPORT viewport(_backBuffers[0]);
-	CD3DX12_RECT scissorrect(0, 0, window_width, window_height);
+	
 
 	
-	//シェーダ側に渡すための基本的な環境データ
-	struct SceneData {
-		XMMATRIX world;//ワールド行列
-		XMMATRIX view;//ビュープロジェクション行列
-		XMMATRIX proj;//
-		XMFLOAT3 eye;//視点座標
-	};
+
 
 	//定数バッファ作成
-	XMMATRIX worldMat = XMMatrixIdentity();
+	worldMat = XMMatrixIdentity();
 	XMFLOAT3 eye(0, 15, -15);
 	XMFLOAT3 target(0, 15, 0);
 	XMFLOAT3 up(0, 1, 0);
-	auto viewMat=XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
-	auto projMat=XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
+	viewMat=XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+	projMat=XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
 		static_cast<float>(window_width) / static_cast<float>(window_height),//アス比
 		1.0f,//近い方
 		100.0f//遠い方
@@ -1064,14 +1114,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		IID_PPV_ARGS(constBuff.ReleaseAndGetAddressOf())
 	);
 
-	SceneData* mapScene=nullptr;//マップ先を示すポインタ
+	 mapScene=nullptr;//マップ先を示すポインタ
 	result = constBuff->Map(0,nullptr,(void**)&mapScene);//マップ
 	//行列の内容をコピー
 	mapScene->world = worldMat;
 	mapScene->view= viewMat;
 	mapScene->proj = projMat;
 	mapScene->eye = eye;
-	ComPtr<ID3D12DescriptorHeap> basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//シェーダから見えるように
 	descHeapDesc.NodeMask = 0;//マスクは0
