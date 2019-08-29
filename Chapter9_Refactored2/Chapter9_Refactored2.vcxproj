@@ -20,10 +20,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{10DA7259-D698-41FB-86FC-0B920EC7606B}</ProjectGuid>
+    <ProjectGuid>{C030E26B-7C82-4D22-811E-BCBA1CD700FF}</ProjectGuid>
     <RootNamespace>Dx12BookSamples</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>Chapter9_Refactored</ProjectName>
+    <ProjectName>Chapter9_Refactored2</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -150,9 +150,13 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PMDActor.cpp" />
+    <ClCompile Include="PMDRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="PMDActor.h" />
+    <ClInclude Include="PMDRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

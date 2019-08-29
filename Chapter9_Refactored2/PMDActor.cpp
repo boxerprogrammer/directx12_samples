@@ -1,7 +1,6 @@
 #include "PMDActor.h"
 
 
-
 PMDActor::PMDActor()
 {
 }
