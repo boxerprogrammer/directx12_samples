@@ -11,7 +11,10 @@ private:
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 	ComPtr< ID3D12DescriptorHeap> _materialHeap = nullptr;//マテリアルヒープ(5個ぶん)
 public:
-	PMDActor();
+	PMDActor(const char* filepath);
 	~PMDActor();
+	PMDActor* Clone();
+	void Update();
+	void Draw();
 };
 
