@@ -204,7 +204,6 @@ Application::LoadTextureFromFile(std::string& texPath) {
 		return _resourceTable[texPath];
 	}
 
-
 	//WICテクスチャのロード
 	TexMetadata metadata = {};
 	ScratchImage scratchImg = {};
@@ -367,17 +366,14 @@ Application::InitializeCommand() {
 		return result;
 	}
 
-
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;//タイムアウトなし
 	cmdQueueDesc.NodeMask = 0;
 	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;//プライオリティ特に指定なし
 	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;//ここはコマンドリストと合わせてください
 	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(_cmdQueue.ReleaseAndGetAddressOf()));//コマンドキュー生成
-	if (FAILED(result)) {
-		assert(0);
-	}
-
+	assert(SUCCEEDED(result));
+	return result;
 }
 
 HRESULT 
