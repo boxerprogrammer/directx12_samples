@@ -1,7 +1,7 @@
 #include "PMDActor.h"
 
 
-PMDActor::PMDActor()
+PMDActor::PMDActor(const char* filepath)
 {
 }
 
