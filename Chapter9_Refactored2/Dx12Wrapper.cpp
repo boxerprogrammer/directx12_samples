@@ -177,7 +177,7 @@ Dx12Wrapper::~Dx12Wrapper()
 
 
 ComPtr<ID3D12Resource>
-Dx12Wrapper::GetTextureByName(const char* texpath) {
+Dx12Wrapper::GetTextureByPath(const char* texpath) {
 	auto it = _textureTable.find(texpath);
 	if (it != _textureTable.end()) {
 		//テーブルに内にあったらロードするのではなくマップ内の

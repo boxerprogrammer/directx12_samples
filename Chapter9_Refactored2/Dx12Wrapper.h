@@ -78,7 +78,7 @@ public:
 	~Dx12Wrapper();
 	///テクスチャパスから必要なテクスチャバッファへのポインタを返す
 	///@param texpath テクスチャファイルパス
-	ComPtr<ID3D12Resource> GetTextureByName(const char* texpath);
+	ComPtr<ID3D12Resource> GetTextureByPath(const char* texpath);
 
 	ComPtr< ID3D12Device> Device();//デバイス
 	ComPtr < ID3D12GraphicsCommandList> CommandList();//コマンドリスト

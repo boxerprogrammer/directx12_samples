@@ -5,12 +5,19 @@
 #include<vector>
 #include<wrl.h>
 
+class Dx12Wrapper;
 class PMDActor
 {
 private:
-
+	Dx12Wrapper& _dx12;
 	template<typename T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
+	
+	ComPtr<ID3D12Resource> _vb = nullptr;
+	ComPtr<ID3D12Resource> _ib = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW _vbView = {};
+	D3D12_INDEX_BUFFER_VIEW _ibView = {};
+
 
 	//シェーダ側に投げられるマテリアルデータ
 	struct MaterialForHlsl {
@@ -33,31 +40,30 @@ private:
 		AdditionalMaterial additional;
 	};
 
-
+	//マテリアル関連
 	std::vector<Material> _materials;
+	ComPtr<ID3D12Resource> _materialBuff = nullptr;
 	std::vector<ComPtr<ID3D12Resource>> _textureResources;
 	std::vector<ComPtr<ID3D12Resource>> _sphResources;
 	std::vector<ComPtr<ID3D12Resource>> _spaResources;
 	std::vector<ComPtr<ID3D12Resource>> _toonResources;
 	
-	ComPtr<ID3D12Resource> _vb=nullptr;
-	ComPtr<ID3D12Resource> _ib=nullptr;
-	D3D12_VERTEX_BUFFER_VIEW _vbv = {};
-	D3D12_INDEX_BUFFER_VIEW _ibv = {};
+	//読み込んだマテリアルをもとにマテリアルバッファを作成
+	HRESULT CreateMaterialData();
+	
 	ComPtr< ID3D12DescriptorHeap> _materialHeap = nullptr;//マテリアルヒープ(5個ぶん)
-
-
-
 	//マテリアル＆テクスチャのビューを作成
-	void CreateMaterialAndTextureView();
+	HRESULT CreateMaterialAndTextureView();
+
 	//座標変換用ビューの生成
 	HRESULT CreateTransformView();
 
-	bool LoadPMD(const char* filepath);
-
+	//PMDファイルのロード
+	HRESULT LoadPMDFile(const char* path);
 public:
-	PMDActor(const char* filepath);
+	PMDActor(const char* filepath,Dx12Wrapper& dx12);
 	~PMDActor();
+	///クローンは頂点およびマテリアルは共通のバッファを見るようにする
 	PMDActor* Clone();
 	void Update();
 	void Draw();
