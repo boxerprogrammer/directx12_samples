@@ -1,4 +1,5 @@
 #include "PMDActor.h"
+#include"PMDRenderer.h"
 #include"Dx12Wrapper.h"
 #include<d3dx12.h>
 using namespace Microsoft::WRL;
@@ -42,7 +43,7 @@ namespace {
 	}
 }
 
-PMDActor::PMDActor(const char* filepath,Dx12Wrapper& dx12):_dx12(dx12)
+PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):_renderer(renderer),_dx12(renderer._dx12)
 {
 }
 
@@ -280,57 +281,61 @@ PMDActor::CreateMaterialAndTextureView() {
 		assert(SUCCEEDED(result));
 		return result;
 	}
-
-	auto materialBuffSize = _materialBuff->GetDesc().Width;
+	auto materialBuffSize = sizeof(MaterialForHlsl);
+	materialBuffSize = (materialBuffSize + 0xff)&~0xff;
+	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
+	matCBVDesc.BufferLocation = _materialBuff->GetGPUVirtualAddress();
+	matCBVDesc.SizeInBytes = materialBuffSize;
+	
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;//後述
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc.Texture2D.MipLevels = 1;//ミップマップは使用しないので1
 	CD3DX12_CPU_DESCRIPTOR_HANDLE matDescHeapH(_materialHeap->GetCPUDescriptorHandleForHeapStart());
-	auto incSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for (int i = 0; i < _materialNum; ++i) {
+	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	for (int i = 0; i < _materials.size(); ++i) {
 		//マテリアル固定バッファビュー
-		_dev->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
+		_dx12.Device()->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
 		matDescHeapH.ptr += incSize;
 		matCBVDesc.BufferLocation += materialBuffSize;
 		if (_textureResources[i] == nullptr) {
-			srvDesc.Format = _whiteTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(_whiteTex.Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _renderer._whiteTex->GetDesc().Format;
+			_dx12.Device()->CreateShaderResourceView(_renderer._whiteTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
 			srvDesc.Format = _textureResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(_textureResources[i].Get(), &srvDesc, matDescHeapH);
+			_dx12.Device()->CreateShaderResourceView(_textureResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.Offset(incSize);
 
 		if (_sphResources[i] == nullptr) {
-			srvDesc.Format = _whiteTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(_whiteTex.Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _renderer._whiteTex->GetDesc().Format;
+			_dx12.Device()->CreateShaderResourceView(_renderer._whiteTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
 			srvDesc.Format = _sphResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(_sphResources[i].Get(), &srvDesc, matDescHeapH);
+			_dx12.Device()->CreateShaderResourceView(_sphResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 
 		if (_spaResources[i] == nullptr) {
-			srvDesc.Format = _blackTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(_blackTex.Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _renderer._blackTex->GetDesc().Format;
+			_dx12.Device()->CreateShaderResourceView(_renderer._blackTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
 			srvDesc.Format = _spaResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(_spaResources[i].Get(), &srvDesc, matDescHeapH);
+			_dx12.Device()->CreateShaderResourceView(_spaResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 
 
 		if (_toonResources[i] == nullptr) {
-			srvDesc.Format = _gradTex->GetDesc().Format;
-			_dev->CreateShaderResourceView(_gradTex.Get(), &srvDesc, matDescHeapH);
+			srvDesc.Format = _renderer._gradTex->GetDesc().Format;
+			_dx12.Device()->CreateShaderResourceView(_renderer._gradTex.Get(), &srvDesc, matDescHeapH);
 		}
 		else {
 			srvDesc.Format = _toonResources[i]->GetDesc().Format;
-			_dev->CreateShaderResourceView(_toonResources[i].Get(), &srvDesc, matDescHeapH);
+			_dx12.Device()->CreateShaderResourceView(_toonResources[i].Get(), &srvDesc, matDescHeapH);
 		}
 		matDescHeapH.ptr += incSize;
 	}

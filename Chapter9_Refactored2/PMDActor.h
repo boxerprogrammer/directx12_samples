@@ -6,9 +6,12 @@
 #include<wrl.h>
 
 class Dx12Wrapper;
+class PMDRenderer;
 class PMDActor
 {
+	friend PMDRenderer;
 private:
+	PMDRenderer& _renderer;
 	Dx12Wrapper& _dx12;
 	template<typename T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -61,7 +64,7 @@ private:
 	//PMDファイルのロード
 	HRESULT LoadPMDFile(const char* path);
 public:
-	PMDActor(const char* filepath,Dx12Wrapper& dx12);
+	PMDActor(const char* filepath,PMDRenderer& renderer);
 	~PMDActor();
 	///クローンは頂点およびマテリアルは共通のバッファを見るようにする
 	PMDActor* Clone();

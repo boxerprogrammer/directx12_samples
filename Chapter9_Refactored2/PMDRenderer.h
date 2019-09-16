@@ -9,7 +9,7 @@ class Dx12Wrapper;
 class PMDActor;
 class PMDRenderer
 {
-	
+	friend PMDActor;
 private:
 	Dx12Wrapper& _dx12;
 	template<typename T>
