@@ -40,5 +40,7 @@ public:
 	~PMDRenderer();
 	void Update();
 	void Draw();
+	ID3D12PipelineState* GetPipelineState();
+	ID3D12RootSignature* GetRootSignature();
 };
 

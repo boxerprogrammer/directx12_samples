@@ -16,11 +16,14 @@ private:
 	template<typename T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 	
+	//頂点関連
 	ComPtr<ID3D12Resource> _vb = nullptr;
 	ComPtr<ID3D12Resource> _ib = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW _vbView = {};
 	D3D12_INDEX_BUFFER_VIEW _ibView = {};
 
+	ComPtr<ID3D12Resource> _transformMat = nullptr;//座標変換行列(今はワールドのみ)
+	ComPtr<ID3D12DescriptorHeap> _transformHeap = nullptr;//座標変換ヒープ
 
 	//シェーダ側に投げられるマテリアルデータ
 	struct MaterialForHlsl {
@@ -70,5 +73,6 @@ public:
 	PMDActor* Clone();
 	void Update();
 	void Draw();
+
 };
 

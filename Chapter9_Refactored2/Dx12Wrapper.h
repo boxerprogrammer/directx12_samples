@@ -6,6 +6,7 @@
 #include<wrl.h>
 #include<string>
 #include<functional>
+
 class Dx12Wrapper
 {
 	SIZE _winSize;
@@ -73,14 +74,22 @@ class Dx12Wrapper
 	void CreateTextureLoaderTable();
 	//テクスチャ名からテクスチャバッファ作成、中身をコピー
 	ID3D12Resource* CreateTextureFromFile(const char* texpath);
+
+
+
 public:
 	Dx12Wrapper(HWND hwnd);
 	~Dx12Wrapper();
+
+	void Update();
+	void BeginDraw();
+	void EndDraw();
 	///テクスチャパスから必要なテクスチャバッファへのポインタを返す
 	///@param texpath テクスチャファイルパス
 	ComPtr<ID3D12Resource> GetTextureByPath(const char* texpath);
 
 	ComPtr< ID3D12Device> Device();//デバイス
 	ComPtr < ID3D12GraphicsCommandList> CommandList();//コマンドリスト
+	ComPtr < IDXGISwapChain4> Swapchain();//スワップチェイン
 };
 

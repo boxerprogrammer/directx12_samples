@@ -2,6 +2,12 @@
 #include<cassert>
 #include<d3dx12.h>
 
+
+#pragma comment(lib,"DirectXTex.lib")
+#pragma comment(lib,"d3d12.lib")
+#pragma comment(lib,"dxgi.lib")
+#pragma comment(lib,"d3dcompiler.lib")
+
 using namespace Microsoft::WRL;
 using namespace std;
 using namespace DirectX;
@@ -450,4 +456,73 @@ Dx12Wrapper::Device() {
 ComPtr < ID3D12GraphicsCommandList> 
 Dx12Wrapper::CommandList() {
 	return _cmdList;
+}
+
+void 
+Dx12Wrapper::Update() {
+
+}
+
+void
+Dx12Wrapper::BeginDraw() {
+	//DirectX処理
+	//バックバッファのインデックスを取得
+	auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+
+	_cmdList->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+
+	//レンダーターゲットを指定
+	auto rtvH = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+	rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	//深度を指定
+	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
+	_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+
+	//画面クリア
+	float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
+	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+	//ビューポート、シザー矩形のセット
+	_cmdList->RSSetViewports(1, _viewport.get());
+	_cmdList->RSSetScissorRects(1, _scissorrect.get());
+
+}
+
+void
+Dx12Wrapper::EndDraw() {
+	auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+	_cmdList->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+	//命令のクローズ
+	_cmdList->Close();
+
+
+
+	//コマンドリストの実行
+	ID3D12CommandList* cmdlists[] = { _cmdList.Get() };
+	_cmdQueue->ExecuteCommandLists(1, cmdlists);
+	////待ち
+	_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
+
+	if (_fence->GetCompletedValue() != _fenceVal) {
+		auto event = CreateEvent(nullptr, false, false, nullptr);
+		_fence->SetEventOnCompletion(_fenceVal, event);
+		WaitForSingleObject(event, INFINITE);
+		CloseHandle(event);
+	}
+	_cmdAllocator->Reset();//キューをクリア
+	_cmdList->Reset(_cmdAllocator.Get(), nullptr);//再びコマンドリストをためる準備
+}
+
+ComPtr < IDXGISwapChain4> 
+Dx12Wrapper::Swapchain() {
+	return _swapchain;
 }

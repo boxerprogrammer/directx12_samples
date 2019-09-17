@@ -210,3 +210,13 @@ PMDRenderer::CreateRootSignature() {
 	}
 	return result;
 }
+
+ID3D12PipelineState* 
+PMDRenderer::GetPipelineState() {
+	return _pipeline.Get();
+}
+
+ID3D12RootSignature* 
+PMDRenderer::GetRootSignature() {
+	return _rootSignature.Get();
+}

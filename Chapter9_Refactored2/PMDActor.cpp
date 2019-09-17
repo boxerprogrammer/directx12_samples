@@ -340,3 +340,36 @@ PMDActor::CreateMaterialAndTextureView() {
 		matDescHeapH.ptr += incSize;
 	}
 }
+
+
+void 
+PMDActor::Update() {
+
+}
+void 
+PMDActor::Draw() {
+	_dx12.CommandList()->IASetVertexBuffers(0, 1, &_vbView);
+	_dx12.CommandList()->IASetIndexBuffer(&_ibView);
+
+	ID3D12DescriptorHeap* transheaps[] = {_transformHeap.Get()};
+	_dx12.CommandList()->SetDescriptorHeaps(1, transheaps);
+	_dx12.CommandList()->SetGraphicsRootDescriptorTable(0, _transformHeap->GetGPUDescriptorHandleForHeapStart());
+
+
+
+	ID3D12DescriptorHeap* mdh[] = { _materialHeap.Get() };
+	//ƒ}ƒeƒŠƒAƒ‹
+	_dx12.CommandList()->SetDescriptorHeaps(1, mdh);
+
+	auto materialH = _materialHeap->GetGPUDescriptorHandleForHeapStart();
+	unsigned int idxOffset = 0;
+
+	auto cbvsrvIncSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 5;
+	for (auto& m : _materials) {
+		_dx12.CommandList()->SetGraphicsRootDescriptorTable(1, materialH);
+		_dx12.CommandList()->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
+		materialH.ptr += cbvsrvIncSize;
+		idxOffset += m.indicesNum;
+	}
+
+}

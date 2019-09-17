@@ -11,6 +11,9 @@
 #include<d3dx12.h>
 #include<wrl.h>
 
+class Dx12Wrapper;
+class PMDRenderer;
+class PMDActor;
 ///シングルトンクラス
 class Application
 {
@@ -19,144 +22,12 @@ private:
 	//ウィンドウ周り
 	WNDCLASSEX _windowClass;
 	HWND _hwnd;
-
-	template<typename T>
-	using ComPtr = Microsoft::WRL::ComPtr<T>;
-	//DXGIまわり
-	ComPtr < IDXGIFactory6> _dxgiFactory = nullptr;//DXGIインターフェイス
-	ComPtr < IDXGISwapChain4> _swapchain = nullptr;//スワップチェイン
-
-	//DirectX12まわり
-	ComPtr< ID3D12Device> _dev = nullptr;//デバイス
-	ComPtr < ID3D12CommandAllocator> _cmdAllocator = nullptr;//コマンドアロケータ
-	ComPtr < ID3D12GraphicsCommandList> _cmdList = nullptr;//コマンドリスト
-	ComPtr < ID3D12CommandQueue> _cmdQueue = nullptr;//コマンドキュー
-
-	//必要最低限のバッファまわり
-	ComPtr<ID3D12Resource> _depthBuffer = nullptr;
-	ComPtr<ID3D12Resource> _vertBuff = nullptr;
-	ComPtr<ID3D12Resource> _idxBuff = nullptr;
-	ComPtr<ID3D12Resource> _constBuff = nullptr;
-
-	//ロード用テーブル
-	using LoadLambda_t = std::function<HRESULT(const std::wstring& path, DirectX::TexMetadata*, DirectX::ScratchImage&)>;
-	std::map < std::string, LoadLambda_t> _loadLambdaTable;
-
-	//マテリアル周り
-	unsigned int _materialNum;//マテリアル数
-	ComPtr<ID3D12Resource> _materialBuff = nullptr;
-	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-
-	//デフォルトのテクスチャ(白、黒、グレイスケールグラデーション)
-	ComPtr<ID3D12Resource> _whiteTex = nullptr;
-	ComPtr<ID3D12Resource> _blackTex = nullptr;
-	ComPtr<ID3D12Resource> _gradTex = nullptr;
-
-	//座標変換系行列
-	DirectX::XMMATRIX _worldMat;
-	DirectX::XMMATRIX _viewMat;
-	DirectX::XMMATRIX _projMat;
-
-	//シェーダ側に投げられるマテリアルデータ
-	struct MaterialForHlsl {
-		DirectX::XMFLOAT3 diffuse; //ディフューズ色
-		float alpha; // ディフューズα
-		DirectX::XMFLOAT3 specular; //スペキュラ色
-		float specularity;//スペキュラの強さ(乗算値)
-		DirectX::XMFLOAT3 ambient; //アンビエント色
-	};
-	//それ以外のマテリアルデータ
-	struct AdditionalMaterial {
-		std::string texPath;//テクスチャファイルパス
-		int toonIdx; //トゥーン番号
-		bool edgeFlg;//マテリアル毎の輪郭線フラグ
-	};
-	//まとめたもの
-	struct Material {
-		unsigned int indicesNum;//インデックス数
-		MaterialForHlsl material;
-		AdditionalMaterial additional;
-	};
-	std::vector<Material> _materials;
-	std::vector<ComPtr<ID3D12Resource>> _textureResources;
-	std::vector<ComPtr<ID3D12Resource>> _sphResources;
-	std::vector<ComPtr<ID3D12Resource>> _spaResources;
-	std::vector<ComPtr<ID3D12Resource>> _toonResources;
-
-	//シェーダ側に渡すための基本的な環境データ
-	struct SceneData {
-		DirectX::XMMATRIX world;//ワールド行列
-		DirectX::XMMATRIX view;//ビュープロジェクション行列
-		DirectX::XMMATRIX proj;//
-		DirectX::XMFLOAT3 eye;//視点座標
-	};
-	SceneData* _mapScene;
-	ComPtr<ID3D12DescriptorHeap> _basicDescHeap = nullptr;
-	ComPtr<ID3D12DescriptorHeap> _materialDescHeap = nullptr;
-
-	ComPtr<ID3D12Fence> _fence = nullptr;
-	UINT64 _fenceVal = 0;
-
-	//頂点＆インデックスバッファビュー
-	D3D12_VERTEX_BUFFER_VIEW _vbView = {};
-	D3D12_INDEX_BUFFER_VIEW _ibView = {};
-
-	//ファイル名パスとリソースのマップテーブル
-	std::map<std::string, ID3D12Resource*> _resourceTable;
-
-	//パイプライン＆ルートシグネチャ
-	ComPtr<ID3D12PipelineState> _pipelinestate = nullptr;
-	ComPtr<ID3D12RootSignature> _rootsignature = nullptr;
-
-	std::vector<ID3D12Resource*> _backBuffers;//バックバッファ
-	ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;//レンダーターゲット用デスクリプタヒープ
-	ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;//深度バッファビュー用デスクリプタヒープ
-	CD3DX12_VIEWPORT _viewport;//ビューポート
-	CD3DX12_RECT _scissorrect;//シザー矩形
-
-	//テクスチャバッファ周り
-	ID3D12Resource* CreateWhiteTexture();//白テクスチャの生成
-	ID3D12Resource*	CreateBlackTexture();//黒テクスチャの生成
-	ID3D12Resource*	CreateGrayGradationTexture();//グレーテクスチャの生成
-	ID3D12Resource*	LoadTextureFromFile(std::string& texPath);//指定テクスチャのロード
-
-	//最終的なレンダーターゲットの生成
-	HRESULT	CreateFinalRenderTarget(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& rtvHeaps, std::vector<ID3D12Resource *>& backBuffers);
-
-	//スワップチェインの生成
-	HRESULT CreateSwapChain(const HWND &hwnd, Microsoft::WRL::ComPtr<IDXGIFactory6> dxgiFactory);
+	std::shared_ptr<Dx12Wrapper> _dx12;
+	std::shared_ptr<PMDRenderer> _pmdRenderer;
+	std::shared_ptr<PMDActor> _pmdActor;
 
 	//ゲーム用ウィンドウの生成
 	void CreateGameWindow(HWND &hwnd, WNDCLASSEX &windowClass);
-
-	//DXGIまわり初期化
-	HRESULT InitializeDXGIDevice();
-
-	//コマンドまわり初期化
-	HRESULT InitializeCommand();
-
-	//パイプライン初期化
-	HRESULT CreateBasicGraphicsPipeline();
-	//ルートシグネチャ初期化
-	HRESULT CreateRootSignature();
-
-	//テクスチャローダテーブルの作成
-	void CreateTextureLoaderTable();
-
-	//デプスステンシルビューの生成
-	HRESULT CreateDepthStencilView();
-
-	//PMDファイルのロード
-	HRESULT LoadPMDFile(const char* path);
-
-	//GPU側のマテリアルデータの作成
-	HRESULT CreateMaterialData();
-
-	//座標変換用ビューの生成
-	HRESULT CreateSceneTransformView();
-
-	//マテリアル＆テクスチャのビューを作成
-	void CreateMaterialAndTextureView();
 
 	//↓シングルトンのためにコンストラクタをprivateに
 	//さらにコピーと代入を禁止に
