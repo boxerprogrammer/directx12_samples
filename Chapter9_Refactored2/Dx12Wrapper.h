@@ -91,5 +91,8 @@ public:
 	ComPtr< ID3D12Device> Device();//デバイス
 	ComPtr < ID3D12GraphicsCommandList> CommandList();//コマンドリスト
 	ComPtr < IDXGISwapChain4> Swapchain();//スワップチェイン
+
+	void SetScene();
+
 };
 

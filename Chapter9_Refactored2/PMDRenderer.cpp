@@ -3,10 +3,27 @@
 #include<cassert>
 #include<d3dcompiler.h>
 #include"Dx12Wrapper.h"
+#include<string>
+#include<algorithm>
 
+using namespace std;
+
+namespace {
+	void PrintErrorBlob(ID3DBlob* blob) {
+		assert(blob);
+		string err;
+		err.resize(blob->GetBufferSize());
+		copy_n((char*)blob->GetBufferPointer(),err.size(),err.begin());
+	}
+}
 
 PMDRenderer::PMDRenderer(Dx12Wrapper& dx12):_dx12(dx12)
 {
+	assert(SUCCEEDED(CreateRootSignature()));
+	assert(SUCCEEDED(CreateGraphicsPipelineForPMD()));
+	_whiteTex= CreateWhiteTexture();
+	_blackTex = CreateBlackTexture();
+	_gradTex = CreateGrayGradationTexture();
 }
 
 
@@ -116,7 +133,8 @@ PMDRenderer::CreateGraphicsPipelineForPMD() {
 		"BasicVS", "vs_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &vsBlob, &errorBlob);
-	if (CheckShaderCompileResult(result,errorBlob.Get())){
+	if (!CheckShaderCompileResult(result,errorBlob.Get())){
+		assert(0);
 		return result;
 	}
 	result = D3DCompileFromFile(L"BasicShader.hlsl",
@@ -124,7 +142,8 @@ PMDRenderer::CreateGraphicsPipelineForPMD() {
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &psBlob, &errorBlob);
-	if (CheckShaderCompileResult(result, errorBlob.Get())) {
+	if (!CheckShaderCompileResult(result, errorBlob.Get())) {
+		assert(0);
 		return result;
 	}
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
@@ -178,7 +197,7 @@ HRESULT
 PMDRenderer::CreateRootSignature() {
 	//レンジ
 	CD3DX12_DESCRIPTOR_RANGE  descTblRanges[4] = {};//テクスチャと定数の２つ
-	descTblRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);//定数[b0,b1](ビュープロジェクション用)
+	descTblRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);//定数[b0](ビュープロジェクション用)
 	descTblRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);//定数[b1](ワールド、ボーン用)
 	descTblRanges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2);//定数[b2](マテリアル用)
 	descTblRanges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);//テクスチャ４つ(基本とsphとspaとトゥーン)

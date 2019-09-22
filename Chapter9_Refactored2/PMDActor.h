@@ -46,6 +46,17 @@ private:
 		AdditionalMaterial additional;
 	};
 
+	struct Transform {
+		//内部に持ってるXMMATRIXメンバが16バイトアライメントであるため
+		//Transformをnewする際には16バイト境界に確保する
+		void* operator new(size_t size);
+		DirectX::XMMATRIX world;
+	};
+
+	Transform _transform;
+	Transform* _mappedTransform = nullptr;
+	ComPtr<ID3D12Resource> _transformBuff = nullptr;
+
 	//マテリアル関連
 	std::vector<Material> _materials;
 	ComPtr<ID3D12Resource> _materialBuff = nullptr;
@@ -66,6 +77,8 @@ private:
 
 	//PMDファイルのロード
 	HRESULT LoadPMDFile(const char* path);
+
+	float _angle;//テスト用Y軸回転
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);
 	~PMDActor();

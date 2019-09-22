@@ -63,6 +63,14 @@ Application::CreateGameWindow(HWND &hwnd, WNDCLASSEX &windowClass) {
 
 }
 
+SIZE
+Application::GetWindowSize()const {
+	SIZE ret;
+	ret.cx = window_width;
+	ret.cy = window_height;
+	return ret;
+}
+
 
 
 void 
@@ -97,7 +105,9 @@ Application::Run() {
 
 		_dx12->CommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		
+		_dx12->SetScene();
 		
+		_pmdActor->Update();
 		_pmdActor->Draw();
 
 

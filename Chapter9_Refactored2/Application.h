@@ -10,6 +10,7 @@
 #include<DirectXTex.h>
 #include<d3dx12.h>
 #include<wrl.h>
+#include<memory>
 
 class Dx12Wrapper;
 class PMDRenderer;
@@ -46,7 +47,7 @@ public:
 
 	///Œãˆ—
 	void Terminate();
-
+	SIZE GetWindowSize()const;
 	~Application();
 };
 

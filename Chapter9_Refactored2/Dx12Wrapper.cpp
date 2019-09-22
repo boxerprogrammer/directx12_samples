@@ -1,7 +1,7 @@
 #include "Dx12Wrapper.h"
 #include<cassert>
 #include<d3dx12.h>
-
+#include"Application.h"
 
 #pragma comment(lib,"DirectXTex.lib")
 #pragma comment(lib,"d3d12.lib")
@@ -93,6 +93,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd){
 	EnableDebugLayer();
 #endif
 
+	auto& app=Application::Instance();
+	_winSize = app.GetWindowSize();
+
 	//DirectX12関連初期化
 	if (FAILED(InitializeDXGIDevice())) {
 		assert(0);
@@ -111,8 +114,14 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd){
 		return;
 	}
 
+	if (FAILED(CreateSceneView())) {
+		assert(0);
+		return;
+	}
+
 	//テクスチャローダー関連初期化
 	CreateTextureLoaderTable();
+
 
 
 	//深度バッファ作成
@@ -126,6 +135,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd){
 		assert(0);
 		return ;
 	}
+	
 }
 
 HRESULT 
@@ -307,9 +317,10 @@ Dx12Wrapper::CreateSwapChain(const HWND& hwnd) {
 	RECT rc = {};
 	::GetWindowRect(hwnd, &rc);
 
+	
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
-	swapchainDesc.Width = rc.right-rc.left;
-	swapchainDesc.Height = rc.bottom-rc.top;
+	swapchainDesc.Width = _winSize.cx;
+	swapchainDesc.Height = _winSize.cy;
 	swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapchainDesc.Stereo = false;
 	swapchainDesc.SampleDesc.Count = 1;
@@ -485,12 +496,22 @@ Dx12Wrapper::BeginDraw() {
 
 
 	//画面クリア
-	float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
+	float clearColor[] = { 1.0f,0.0f,1.0f,1.0f };//白色
 	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
 	//ビューポート、シザー矩形のセット
 	_cmdList->RSSetViewports(1, _viewport.get());
 	_cmdList->RSSetScissorRects(1, _scissorrect.get());
+
+
+}
+
+void 
+Dx12Wrapper::SetScene() {
+	//現在のシーン(ビュープロジェクション)をセット
+	ID3D12DescriptorHeap* sceneheaps[] = { _sceneDescHeap.Get() };
+	_cmdList->SetDescriptorHeaps(1, sceneheaps);
+	_cmdList->SetGraphicsRootDescriptorTable(0, _sceneDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 }
 

@@ -43,8 +43,21 @@ namespace {
 	}
 }
 
-PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):_renderer(renderer),_dx12(renderer._dx12)
+void* 
+PMDActor::Transform::operator new(size_t size) {
+	return _mm_malloc(size, 16);
+}
+
+PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
+	_renderer(renderer),
+	_dx12(renderer._dx12),
+	_angle(0.0f)
 {
+	_transform.world = XMMatrixIdentity();
+	LoadPMDFile(filepath);
+	CreateTransformView();
+	CreateMaterialData();
+	CreateMaterialAndTextureView();
 }
 
 
@@ -230,6 +243,54 @@ PMDActor::LoadPMDFile(const char* path) {
 		}
 	}
 	fclose(fp);
+
+}
+
+HRESULT 
+PMDActor::CreateTransformView() {
+	//GPUバッファ作成
+	auto buffSize = sizeof(Transform);
+	buffSize = (buffSize + 0xff)&~0xff;
+	auto result = _dx12.Device()->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(buffSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf())
+	);
+	if (FAILED(result)) {
+		assert(SUCCEEDED(result));
+		return result;
+	}
+
+	//マップとコピー
+	result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
+	if (FAILED(result)) {
+		assert(SUCCEEDED(result));
+		return result;
+	}
+	*_mappedTransform = _transform;
+
+	//ビューの作成
+	D3D12_DESCRIPTOR_HEAP_DESC transformDescHeapDesc = {};
+	transformDescHeapDesc.NumDescriptors = 1;//とりあえずワールドひとつ
+	transformDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	transformDescHeapDesc.NodeMask = 0;
+
+	transformDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
+	result = _dx12.Device()->CreateDescriptorHeap(&transformDescHeapDesc, IID_PPV_ARGS(_transformHeap.ReleaseAndGetAddressOf()));//生成
+	if (FAILED(result)) {
+		assert(SUCCEEDED(result));
+		return result;
+	}
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = buffSize;
+	_dx12.Device()->CreateConstantBufferView(&cbvDesc, _transformHeap->GetCPUDescriptorHandleForHeapStart());
+
+	return S_OK;
 }
 
 HRESULT
@@ -344,7 +405,8 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-
+	_angle += 0.01f;
+	_mappedTransform->world =  XMMatrixRotationY(_angle);
 }
 void 
 PMDActor::Draw() {
@@ -353,7 +415,7 @@ PMDActor::Draw() {
 
 	ID3D12DescriptorHeap* transheaps[] = {_transformHeap.Get()};
 	_dx12.CommandList()->SetDescriptorHeaps(1, transheaps);
-	_dx12.CommandList()->SetGraphicsRootDescriptorTable(0, _transformHeap->GetGPUDescriptorHandleForHeapStart());
+	_dx12.CommandList()->SetGraphicsRootDescriptorTable(1, _transformHeap->GetGPUDescriptorHandleForHeapStart());
 
 
 
@@ -366,7 +428,7 @@ PMDActor::Draw() {
 
 	auto cbvsrvIncSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 5;
 	for (auto& m : _materials) {
-		_dx12.CommandList()->SetGraphicsRootDescriptorTable(1, materialH);
+		_dx12.CommandList()->SetGraphicsRootDescriptorTable(2, materialH);
 		_dx12.CommandList()->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
 		materialH.ptr += cbvsrvIncSize;
 		idxOffset += m.indicesNum;
