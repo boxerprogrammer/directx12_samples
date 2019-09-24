@@ -405,7 +405,7 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-	//_angle += 0.01f;
+	_angle += 0.03f;
 	_mappedTransform->world =  XMMatrixRotationY(_angle);
 }
 void 

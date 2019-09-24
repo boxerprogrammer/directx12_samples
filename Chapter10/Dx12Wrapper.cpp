@@ -533,11 +533,17 @@ Dx12Wrapper::EndDraw() {
 		&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
+
+
+
+	ExecuteCommand();
+}
+
+void Dx12Wrapper::ExecuteCommand()
+{
+
 	//命令のクローズ
 	_cmdList->Close();
-
-
-
 	//コマンドリストの実行
 	ID3D12CommandList* cmdlists[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(1, cmdlists);
