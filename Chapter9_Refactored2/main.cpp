@@ -1,6 +1,6 @@
 #include"Application.h"
 
-#ifdef _DEBUG
+#ifndef _DEBUG
 int main() {
 #else
 #include<Windows.h>

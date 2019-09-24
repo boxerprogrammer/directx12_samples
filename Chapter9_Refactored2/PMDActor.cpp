@@ -45,7 +45,7 @@ namespace {
 
 void* 
 PMDActor::Transform::operator new(size_t size) {
-	return _mm_malloc(size, 16);
+	return _aligned_malloc(size, 16);
 }
 
 PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
@@ -405,7 +405,7 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-	_angle += 0.01f;
+	//_angle += 0.01f;
 	_mappedTransform->world =  XMMatrixRotationY(_angle);
 }
 void 

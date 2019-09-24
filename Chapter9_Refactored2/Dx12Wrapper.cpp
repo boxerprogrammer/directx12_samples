@@ -144,23 +144,34 @@ Dx12Wrapper::CreateDepthStencilView() {
 	auto result = _swapchain->GetDesc1(&desc);
 	//深度バッファ作成
 	//深度バッファの仕様
-	auto depthResDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT,
-		desc.Width, desc.Height,
-		1, 1, 1, 0,
-		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+	//auto depthResDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT,
+	//	desc.Width, desc.Height,
+	//	1, 0, 1, 0,
+	//	D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+
+	D3D12_RESOURCE_DESC resdesc = {};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.Width = desc.Width;
+	resdesc.Height = desc.Height;
+	resdesc.Format = DXGI_FORMAT_D32_FLOAT;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.SampleDesc.Quality = 0;
+	resdesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resdesc.MipLevels = 1;
+	resdesc.Alignment = 0;
 
 	//デプス用ヒーププロパティ
 	auto depthHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	CD3DX12_CLEAR_VALUE depthClearValue(DXGI_FORMAT_D32_FLOAT, 1.0f, 0);
 
-	float clrColor[4] = { 1.0f,1.0f,1.0f,1.0f };
-	CD3DX12_CLEAR_VALUE rtClearValue(DXGI_FORMAT_R8G8B8A8_UINT, clrColor);
-
 	result = _dev->CreateCommittedResource(
 		&depthHeapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&depthResDesc,
+		&resdesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, //デプス書き込みに使用
 		&depthClearValue,
 		IID_PPV_ARGS(_depthBuffer.ReleaseAndGetAddressOf()));
@@ -397,8 +408,8 @@ Dx12Wrapper::CreateSceneView(){
 	_mappedSceneData->view = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
 	_mappedSceneData->proj = XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°
 		static_cast<float>(desc.Width) / static_cast<float>(desc.Height),//アス比
-		1.0f,//近い方
-		100.0f//遠い方
+		0.1f,//近い方
+		1000.0f//遠い方
 	);						
 	_mappedSceneData->eye = eye;
 	
@@ -533,7 +544,7 @@ Dx12Wrapper::EndDraw() {
 	////待ち
 	_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
 
-	if (_fence->GetCompletedValue() != _fenceVal) {
+	if (_fence->GetCompletedValue() < _fenceVal) {
 		auto event = CreateEvent(nullptr, false, false, nullptr);
 		_fence->SetEventOnCompletion(_fenceVal, event);
 		WaitForSingleObject(event, INFINITE);

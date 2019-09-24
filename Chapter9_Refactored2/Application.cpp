@@ -1,27 +1,11 @@
-//コンスタントバッファで行列を転送
-
-
 #include "Application.h"
 #include"Dx12Wrapper.h"
 #include"PMDRenderer.h"
 #include"PMDActor.h"
 
-#ifdef _DEBUG
-#include<iostream>
-#endif
-
-///@brief コンソール画面にフォーマット付き文字列を表示
-///@param format フォーマット(%dとか%fとかの)
-///@param 可変長引数
-///@remarksこの関数はデバッグ用です。デバッグ時にしか動作しません
-void DebugOutputFormatString(const char* format, ...) {
-#ifdef _DEBUG
-	va_list valist;
-	va_start(valist, format);
-	printf(format, valist);
-	va_end(valist);
-#endif
-}
+//ウィンドウ定数
+const unsigned int window_width = 1280;
+const unsigned int window_height = 720;
 
 //面倒だけど書かなあかんやつ
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -31,10 +15,6 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	}
 	return DefWindowProc(hwnd, msg, wparam, lparam);//規定の処理を行う
 }
-
-//ウィンドウ定数
-const unsigned int window_width = 1280;
-const unsigned int window_height = 720;
 
 void 
 Application::CreateGameWindow(HWND &hwnd, WNDCLASSEX &windowClass) {
@@ -80,12 +60,6 @@ Application::Run() {
 	MSG msg = {};
 	unsigned int frame = 0;
 	while (true) {
-		//_worldMat = XMMatrixRotationY(angle);
-		//_mapScene->world = _worldMat;
-		//_mapScene->view = _viewMat;
-		//_mapScene->proj = _projMat;
-		//angle += 0.01f;
-
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -110,15 +84,10 @@ Application::Run() {
 		_pmdActor->Update();
 		_pmdActor->Draw();
 
-
-
-
-
 		_dx12->EndDraw();
 
 		//フリップ
 		_dx12->Swapchain()->Present(1, 0);
-
 	}
 }
 
@@ -127,87 +96,11 @@ Application::Init() {
 	auto result = CoInitializeEx(0, COINIT_MULTITHREADED);
 	CreateGameWindow(_hwnd, _windowClass);
 
-
 	//DirectX12ラッパー生成＆初期化
 	_dx12.reset(new Dx12Wrapper(_hwnd));
 	_pmdRenderer.reset(new PMDRenderer(*_dx12));
 	_pmdActor.reset(new PMDActor("Model/初音ミク.pmd", *_pmdRenderer));
 
-//#ifdef _DEBUG
-//	//デバッグレイヤーをオンに
-//	EnableDebugLayer();
-//#endif
-//
-//	//DirectX12関連初期化
-//	if (FAILED(InitializeDXGIDevice())) {
-//		assert(0);
-//		return false;
-//	}
-//	if (FAILED(InitializeCommand())) {
-//		assert(0);
-//		return false;
-//	}
-//	if (FAILED(CreateSwapChain(_hwnd, _dxgiFactory))) {
-//		assert(0);
-//		return false;
-//	}
-//	if (FAILED(CreateFinalRenderTarget(_rtvHeaps, _backBuffers))) {
-//		assert(0);
-//		return false;
-//	}
-//
-//	//テクスチャローダー関連初期化
-//	CreateTextureLoaderTable();
-
-
-	////深度バッファ作成
-	//if (FAILED(CreateDepthStencilView())) {
-	//	assert(0);
-	//	return false;
-	//}
-
-	////フェンスの作成
-	//if (FAILED(_dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf())))) {
-	//	assert(0);
-	//	return false;
-	//}
-
-
-	//_whiteTex = CreateWhiteTexture();
-	//_blackTex = CreateBlackTexture();
-	//_gradTex = CreateGrayGradationTexture();
-
-	//LoadPMDFile("Model/hibiki/hibiki.pmd");
-	//LoadPMDFile("Model/satori/satori.pmd");
-	//LoadPMDFile("Model/reimu/reimu.pmd");
-	//LoadPMDFile("Model/巡音ルカ.pmd");
-	//if (FAILED(LoadPMDFile("Model/初音ミク.pmd"))) {
-	//	return false;
-	//}
-
-	////ロードしたデータをもとにバッファにマテリアルデータを作る
-	//if (FAILED(CreateMaterialData())) {
-	//	return false;
-	//}
-
-	////マテリアルまわりのビュー作成およびテクスチャビュー作成
-	////同じデスクリプタヒープ内に作っていくためマテリアルと
-	////強い結合状態になっている。
-	//CreateMaterialAndTextureView();
-
-	////ルートシグネチャ作成
-	//if (FAILED(CreateRootSignature())) {
-	//	return false;
-	//}
-
-	////パイプライン設定(シェーダもここで設定)
-	//if (FAILED(CreateBasicGraphicsPipeline())) {
-	//	return false;
-	//}
-
-	//if (FAILED(CreateSceneTransformView())) {
-	//	return false;
-	//}
 	return true;
 }
 
@@ -217,6 +110,11 @@ Application::Terminate() {
 	UnregisterClass(_windowClass.lpszClassName, _windowClass.hInstance);
 }
 
+Application& 
+Application::Instance() {
+	static Application instance;
+	return instance;
+}
 
 Application::Application()
 {
@@ -226,10 +124,3 @@ Application::Application()
 Application::~Application()
 {
 }
-
-Application& 
-Application::Instance() {
-	static Application instance;
-	return instance;
-}
-

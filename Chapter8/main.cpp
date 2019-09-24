@@ -171,7 +171,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	DXGI_SWAP_CHAIN_DESC swcDesc = {};
 	result = _swapchain->GetDesc(&swcDesc);
 	std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
-	D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 
 	//SRGBレンダーターゲットビュー設定
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -182,8 +182,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	for (int i = 0; i < swcDesc.BufferCount; ++i) {
 		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
 		rtvDesc.Format = _backBuffers[i]->GetDesc().Format;
-		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, handle);
-		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, rtvH);
+		rtvH.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
 	//深度バッファ作成
@@ -253,20 +253,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	unsigned int vertNum;//頂点数
 	fread(&vertNum, sizeof(vertNum), 1, fp);
 
-	
-
-	//PMD頂点構造体
-	//struct PMDVertex {
-	//	XMFLOAT3 pos; //頂点座標(12バイト)
-	//	XMFLOAT3 normal; //法線ベクトル(12バイト)
-	//	XMFLOAT2 uv; //UV座標 (8バイト)
-	//	unsigned short boneNo[2]; // ボーン番号(後述)(4バイト)
-	//	unsigned char boneWeight; //ボーン影響度(後述)(1バイト)
-	//	unsigned char edgeFlg; //輪郭線フラグ(1バイト)
-	//};//合計38バイト
 	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
 	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
-	//std::vector<PMDVertex> vertices(vertNum);//バッファ確保
 	fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
 
 	unsigned int indicesNum;//インデックス数
@@ -282,7 +270,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		IID_PPV_ARGS(&vertBuff));
 
 	unsigned char* vertMap = nullptr;
-	//PMDVertex* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 	std::copy(vertices.begin(), vertices.end(), vertMap);
 	vertBuff->Unmap(0, nullptr);
@@ -291,8 +278,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
 	vbView.SizeInBytes = vertices.size();//全バイト数
 	vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
-	//vbView.StrideInBytes = sizeof(PMDVertex);
-
+	
 	std::vector<unsigned short> indices(indicesNum);
 
 	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);
@@ -381,6 +367,55 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;//中身は0xffffffff
 
+	//ハルシェーダ、ドメインシェーダ、ジオメトリシェーダは設定しない
+	gpipeline.HS.BytecodeLength = 0;
+	gpipeline.HS.pShaderBytecode = nullptr;
+	gpipeline.DS.BytecodeLength = 0;
+	gpipeline.DS.pShaderBytecode = nullptr;
+	gpipeline.GS.BytecodeLength = 0;
+	gpipeline.GS.pShaderBytecode = nullptr;
+
+	//ラスタライザ(RS)
+	//gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	gpipeline.RasterizerState.FrontCounterClockwise = false;
+	gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+	gpipeline.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+	gpipeline.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+	gpipeline.RasterizerState.DepthClipEnable = true;
+	gpipeline.RasterizerState.MultisampleEnable = false;
+	gpipeline.RasterizerState.AntialiasedLineEnable = false;
+	gpipeline.RasterizerState.ForcedSampleCount = 0;
+	gpipeline.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
+	gpipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;//三角形
+
+	//OutputMerger部分
+	//レンダーターゲット
+	gpipeline.NumRenderTargets = 1;//注)このターゲット数と設定するフォーマット数は
+	gpipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;//一致させておく事
+
+	//深度ステンシル
+	gpipeline.DepthStencilState.DepthEnable = true;//深度
+	gpipeline.DepthStencilState.StencilEnable = false;//あとで
+	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+	gpipeline.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	//ブレンド設定
+	//gpipeline.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	gpipeline.BlendState.AlphaToCoverageEnable = false;
+	gpipeline.BlendState.IndependentBlendEnable = false;
+	gpipeline.BlendState.RenderTarget->BlendEnable = true;
+	gpipeline.BlendState.RenderTarget->SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	gpipeline.BlendState.RenderTarget->DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	gpipeline.BlendState.RenderTarget->BlendOp = D3D12_BLEND_OP_ADD;
+
+	gpipeline.NodeMask = 0;
+	gpipeline.SampleDesc.Count = 1;
+	gpipeline.SampleDesc.Quality = 0;
+	gpipeline.SampleMask = 0xffffffff;//全部対象
+	gpipeline.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
 	//
 	gpipeline.BlendState.AlphaToCoverageEnable = false;
 	gpipeline.BlendState.IndependentBlendEnable = false;
@@ -397,26 +432,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 
-	
-	gpipeline.RasterizerState.MultisampleEnable = false;//まだアンチェリは使わない
-	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリングしない
-	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;//中身を塗りつぶす
-	gpipeline.RasterizerState.DepthClipEnable = true;//深度方向のクリッピングは有効に
-
-	gpipeline.RasterizerState.FrontCounterClockwise = false;
-	gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-	gpipeline.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-	gpipeline.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-	gpipeline.RasterizerState.AntialiasedLineEnable = false;
-	gpipeline.RasterizerState.ForcedSampleCount = 0;
-	gpipeline.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-
-	gpipeline.DepthStencilState.DepthEnable = true;//深度バッファを使うぞ
-	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;//全て書き込み
-	gpipeline.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;//小さい方を採用
-	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-	gpipeline.DepthStencilState.StencilEnable = false;
 
 	gpipeline.InputLayout.pInputElementDescs = inputLayout;//レイアウト先頭アドレス
 	gpipeline.InputLayout.NumElements = _countof(inputLayout);//レイアウト配列数
@@ -435,11 +450,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	D3D12_DESCRIPTOR_RANGE descTblRange[1] = {};//テクスチャと定数の２つ
-	//descTblRange[0].NumDescriptors = 1;//テクスチャひとつ
-	//descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//種別はテクスチャ
-	//descTblRange[0].BaseShaderRegister = 0;//0番スロットから
-	//descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
 	descTblRange[0].NumDescriptors = 1;//定数ひとつ
 	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//種別は定数
 	descTblRange[0].BaseShaderRegister = 0;//0番スロットから
@@ -451,16 +461,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootparam.DescriptorTable.NumDescriptorRanges = 1;//デスクリプタレンジ数
 	rootparam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//全てのシェーダから見える
 
-	//D3D12_ROOT_PARAMETER rootparam[2] = {};
-	//rootparam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	//rootparam[0].DescriptorTable.pDescriptorRanges = &descTblRange[0];//デスクリプタレンジのアドレス
-	//rootparam[0].DescriptorTable.NumDescriptorRanges = 1;//デスクリプタレンジ数
-	//rootparam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//ピクセルシェーダから見える
-
-	//rootparam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	//rootparam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];//デスクリプタレンジのアドレス
-	//rootparam[1].DescriptorTable.NumDescriptorRanges = 1;//デスクリプタレンジ数
-	//rootparam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;//頂点シェーダから見える
 
 	rootSignatureDesc.pParameters = &rootparam;//ルートパラメータの先頭アドレス
 	rootSignatureDesc.NumParameters = 1;//ルートパラメータ数
@@ -502,50 +502,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	scissorrect.left = 0;//切り抜き左座標
 	scissorrect.right = scissorrect.left + window_width;//切り抜き右座標
 	scissorrect.bottom = scissorrect.top + window_height;//切り抜き下座標
-
-
-	////WICテクスチャのロード
-	//TexMetadata metadata = {};
-	//ScratchImage scratchImg = {};
-	//result = LoadFromWICFile(L"img/textest.png", WIC_FLAGS_NONE, &metadata, scratchImg);
-	//auto img = scratchImg.GetImage(0, 0, 0);//生データ抽出
-
-	////WriteToSubresourceで転送する用のヒープ設定
-	//D3D12_HEAP_PROPERTIES texHeapProp = {};
-	//texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
-	//texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
-	//texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//転送がL0つまりCPU側から直で
-	//texHeapProp.CreationNodeMask = 0;//単一アダプタのため0
-	//texHeapProp.VisibleNodeMask = 0;//単一アダプタのため0
-
-	//D3D12_RESOURCE_DESC resDesc = {};
-	//resDesc.Format = metadata.format;//DXGI_FORMAT_R8G8B8A8_UNORM;//RGBAフォーマット
-	//resDesc.Width = metadata.width;//幅
-	//resDesc.Height = metadata.height;//高さ
-	//resDesc.DepthOrArraySize = metadata.arraySize;//2Dで配列でもないので１
-	//resDesc.SampleDesc.Count = 1;//通常テクスチャなのでアンチェリしない
-	//resDesc.SampleDesc.Quality = 0;//
-	//resDesc.MipLevels = metadata.mipLevels;//ミップマップしないのでミップ数は１つ
-	//resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);//2Dテクスチャ用
-	//resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
-	//resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
-
-	//ID3D12Resource* texbuff = nullptr;
-	//result = _dev->CreateCommittedResource(
-	//	&texHeapProp,
-	//	D3D12_HEAP_FLAG_NONE,//特に指定なし
-	//	&resDesc,
-	//	D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,//テクスチャ用(ピクセルシェーダから見る用)
-	//	nullptr,
-	//	IID_PPV_ARGS(&texbuff)
-	//);
-
-	//result = texbuff->WriteToSubresource(0,
-	//	nullptr,//全領域へコピー
-	//	img->pixels,//元データアドレス
-	//	img->rowPitch,//1ラインサイズ
-	//	img->slicePitch//全サイズ
-	//);
 	
 	//シェーダ側に渡すための基本的な行列データ
 	struct MatricesData {
@@ -579,31 +535,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//行列の内容をコピー
 	mapMatrix->world = worldMat;
 	mapMatrix->viewproj = viewMat*projMat;
-	//constBuff->Unmap(0, nullptr);
+	
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;//シェーダから見えるように
 	descHeapDesc.NodeMask = 0;//マスクは0
-	descHeapDesc.NumDescriptors = 1;//SRV1つとCBV1つ
+	descHeapDesc.NumDescriptors = 1;//CBV1つ
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
 	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&basicDescHeap));//生成
 
-	////通常テクスチャビュー作成
-	//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	//srvDesc.Format = metadata.format;//DXGI_FORMAT_R8G8B8A8_UNORM;//RGBA(0.0f～1.0fに正規化)
-	//srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;//後述
-	//srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	//srvDesc.Texture2D.MipLevels = 1;//ミップマップは使用しないので1
-
 	////デスクリプタの先頭ハンドルを取得しておく
 	auto basicHeapHandle=basicDescHeap->GetCPUDescriptorHandleForHeapStart();
-	////シェーダリソースビューの作成
-	//_dev->CreateShaderResourceView(texbuff, //ビューと関連付けるバッファ
-	//	&srvDesc, //先ほど設定したテクスチャ設定情報
-	//	basicHeapHandle
-	//);
-	//basicHeapHandle.ptr += 
-	//	_dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
@@ -636,17 +578,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//バックバッファのインデックスを取得
 		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
 
-		//D3D12_RESOURCE_BARRIER BarrierDesc = {};
-		//BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		//BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		//BarrierDesc.Transition.pResource = _backBuffers[bbIdx];
-		//BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		//BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-		//BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		D3D12_RESOURCE_BARRIER BarrierDesc = {};
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = _backBuffers[bbIdx];
+		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-		_cmdList->ResourceBarrier(1,
-			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
-				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		_cmdList->ResourceBarrier(1,&BarrierDesc);
 
 		_cmdList->SetPipelineState(_pipelinestate);
 
@@ -674,16 +614,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-		//auto heapHandle=basicDescHeap->GetGPUDescriptorHandleForHeapStart();
-		//heapHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//_cmdList->SetGraphicsRootDescriptorTable(1, heapHandle);
-
-		//_cmdList->DrawInstanced(vertNum, 1, 0, 0);
 		_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
 
-		_cmdList->ResourceBarrier(1,
-			&CD3DX12_RESOURCE_BARRIER::Transition(_backBuffers[bbIdx],
-				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+
+		_cmdList->ResourceBarrier(1, &BarrierDesc);
 
 		//命令のクローズ
 		_cmdList->Close();
@@ -703,8 +639,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			CloseHandle(event);
 		}
 		_cmdAllocator->Reset();//キューをクリア
-		_cmdList->Reset(_cmdAllocator, _pipelinestate);//再びコマンドリストをためる準備
-
+		_cmdList->Reset(_cmdAllocator, nullptr);//再びコマンドリストをためる準備
+		
 
 		//フリップ
 		_swapchain->Present(1, 0);

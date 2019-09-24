@@ -14,7 +14,7 @@ class Dx12Wrapper
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 	//DXGIまわり
-	ComPtr < IDXGIFactory6> _dxgiFactory = nullptr;//DXGIインターフェイス
+	ComPtr < IDXGIFactory4> _dxgiFactory = nullptr;//DXGIインターフェイス
 	ComPtr < IDXGISwapChain4> _swapchain = nullptr;//スワップチェイン
 
 	//DirectX12まわり
