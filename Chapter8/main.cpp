@@ -196,6 +196,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	depthResDesc.Format=DXGI_FORMAT_D32_FLOAT;//深度値書き込み用フォーマット
 	depthResDesc.SampleDesc.Count = 1;//サンプルは1ピクセル当たり1つ
 	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//このバッファは深度ステンシルとして使用します
+	depthResDesc.MipLevels = 1;
+	depthResDesc.Layout= D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	depthResDesc.Alignment = 0;
+
 
 	//デプス用ヒーププロパティ
 	D3D12_HEAP_PROPERTIES depthHeapProp = {};
