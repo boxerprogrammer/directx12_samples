@@ -507,7 +507,7 @@ Dx12Wrapper::BeginDraw() {
 
 
 	//画面クリア
-	float clearColor[] = { 1.0f,0.0f,1.0f,1.0f };//白色
+	float clearColor[] = { 0.0f,0.0f,1.0f,1.0f };//白色
 	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
 	//ビューポート、シザー矩形のセット

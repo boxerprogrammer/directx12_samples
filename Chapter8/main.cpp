@@ -47,7 +47,7 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 const unsigned int window_width = 1280;
 const unsigned int window_height = 720;
 
-IDXGIFactory6* _dxgiFactory = nullptr;
+IDXGIFactory4* _dxgiFactory = nullptr;
 ID3D12Device* _dev = nullptr;
 ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
@@ -104,7 +104,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		D3D_FEATURE_LEVEL_11_1,
 		D3D_FEATURE_LEVEL_11_0,
 	};
-	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+	auto result = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory));
 	std::vector <IDXGIAdapter*> adapters;
 	IDXGIAdapter* tmpAdapter = nullptr;
 	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i) {
@@ -131,7 +131,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
-	//_cmdList->Close();
+	_cmdList->Close();
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;//タイムアウトなし
 	cmdQueueDesc.NodeMask = 0;
@@ -556,7 +556,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//定数バッファビューの作成
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
-
+	//constBuff->Unmap(0, nullptr);
 
 
 	MSG msg = {};
@@ -590,25 +590,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-		_cmdList->ResourceBarrier(1,&BarrierDesc);
-
 		_cmdList->SetPipelineState(_pipelinestate);
-
 
 		//レンダーターゲットを指定
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);		
 		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
-		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-		//画面クリア
 
+		_cmdList->ResourceBarrier(1, &BarrierDesc);
+		_cmdList->OMSetRenderTargets(1, &rtvH, false, &dsvH);
 		float clearColor[] = { 1.0f,1.0f,1.0f,1.0f };//白色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-
+		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorrect);
-		_cmdList->SetGraphicsRootSignature(rootsignature);
 
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);

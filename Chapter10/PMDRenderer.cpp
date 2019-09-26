@@ -185,6 +185,8 @@ PMDRenderer::CreateGraphicsPipelineForPMD() {
 
 	gpipeline.SampleDesc.Count = 1;//サンプリングは1ピクセルにつき１
 	gpipeline.SampleDesc.Quality = 0;//クオリティは最低
+
+
 	result = _dx12.Device()->CreateGraphicsPipelineState(&gpipeline, IID_PPV_ARGS(_pipeline.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		assert(SUCCEEDED(result));
