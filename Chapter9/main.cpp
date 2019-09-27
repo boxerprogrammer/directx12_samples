@@ -9,6 +9,7 @@
 #include<d3dcompiler.h>
 #include<DirectXTex.h>
 #include<d3dx12.h>
+#include<dxgidebug.h>
 
 
 #ifdef _DEBUG
@@ -47,7 +48,7 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 const unsigned int window_width = 1280;
 const unsigned int window_height = 720;
 
-IDXGIFactory6* _dxgiFactory = nullptr;
+IDXGIFactory4* _dxgiFactory = nullptr;
 ID3D12Device* _dev = nullptr;
 ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
@@ -334,10 +335,11 @@ void EnableDebugLayer() {
 	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
 	debugLayer->EnableDebugLayer();
 	debugLayer->Release();
+	
 }
 
 ///スワップチェイン生成関数
-HRESULT CreateSwapChain(const HWND &hwnd,IDXGIFactory6*& dxgiFactory) {
+HRESULT CreateSwapChain(const HWND &hwnd,IDXGIFactory4*& dxgiFactory) {
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
 	swapchainDesc.Width = window_width;
 	swapchainDesc.Height = window_height;
@@ -391,6 +393,7 @@ HRESULT InitializeDXGIDevice() {
 	UINT flagsDXGI = 0;
 	flagsDXGI |= DXGI_CREATE_FACTORY_DEBUG;
 	auto result = CreateDXGIFactory2(flagsDXGI,IID_PPV_ARGS(&_dxgiFactory));
+
 	//DirectX12まわり初期化
 	//フィーチャレベル列挙
 	D3D_FEATURE_LEVEL levels[] = {
@@ -1169,8 +1172,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorrect);
-		_cmdList->SetGraphicsRootSignature(rootsignature);
-
+		
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 		_cmdList->IASetIndexBuffer(&ibView);
@@ -1208,20 +1210,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ID3D12CommandList* cmdlists[] = { _cmdList };
 		_cmdQueue->ExecuteCommandLists(1, cmdlists);
 		////待ち
-		_cmdQueue->Signal(_fence, ++_fenceVal);
+		++_fenceVal;
+		_cmdQueue->Signal(_fence,_fenceVal);
 
 		if (_fence->GetCompletedValue() != _fenceVal) {
 			auto event = CreateEvent(nullptr, false, false, nullptr);
 			_fence->SetEventOnCompletion(_fenceVal, event);
-			WaitForSingleObject(event, INFINITE);
+			WaitForSingleObjectEx(event, INFINITE,false);
 			CloseHandle(event);
 		}
-		_cmdAllocator->Reset();//キューをクリア
-		_cmdList->Reset(_cmdAllocator, _pipelinestate);//再びコマンドリストをためる準備
 
 
 		//フリップ
 		_swapchain->Present(1, 0);
+		_cmdAllocator->Reset();//キューをクリア
+		_cmdList->Reset(_cmdAllocator, _pipelinestate);//再びコマンドリストをためる準備
 
 	}
 	//もうクラス使わんから登録解除してや

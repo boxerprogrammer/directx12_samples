@@ -87,7 +87,7 @@ Application::Run() {
 		_dx12->EndDraw();
 
 		//ƒtƒŠƒbƒv
-		_dx12->Swapchain()->Present(1, 0);
+		_dx12->Swapchain()->Present(0, 0);
 	}
 }
 

@@ -194,10 +194,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 
 	Vertex vertices[] = {
-		{{-0.4f,-0.7f,0.0f},{0.0f,1.0f} },//左下
-		{{-0.4f,0.7f,0.0f} ,{0.0f,0.0f}},//左上
-		{{0.4f,-0.7f,0.0f} ,{1.0f,1.0f}},//右下
-		{{0.4f,0.7f,0.0f} ,{1.0f,0.0f}},//右上
+		{{-0.5f,-0.9f,0.0f},{0.0f,1.0f} },//左下
+		{{-0.5f,0.9f,0.0f} ,{0.0f,0.0f}},//左上
+		{{0.5f,-0.9f,0.0f} ,{1.0f,1.0f}},//右下
+		{{0.5f,0.9f,0.0f} ,{1.0f,0.0f}},//右上
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -556,7 +556,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 		_cmdList->IASetIndexBuffer(&ibView);
 
-		_cmdList->SetGraphicsRootSignature(rootsignature);
 		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
 

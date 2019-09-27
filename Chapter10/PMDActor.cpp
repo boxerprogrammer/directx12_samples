@@ -242,6 +242,22 @@ PMDActor::LoadPMDFile(const char* path) {
 			_spaResources[i] = _dx12.GetTextureByPath(spaFilePath.c_str());
 		}
 	}
+
+	unsigned short boneNum = 0;
+	fread(&boneNum, sizeof(boneNum), 1, fp);
+#pragma pack(1)
+	//読み込み用ボーン構造体
+	struct Bone {
+		char boneName[20];//ボーン名
+		unsigned short parentNo;//親ボーン番号
+		unsigned short nextNo;//先端のボーン番号
+		unsigned char type;//ボーン種別
+		unsigned short ikBoneNo;//IKボーン番号
+		XMFLOAT3 pos;//ボーンの基準点座標
+	};
+#pragma pack()
+	vector<Bone> bones(boneNum);
+	fread(bones.data(), sizeof(Bone), boneNum, fp);
 	fclose(fp);
 
 }
@@ -405,7 +421,7 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-	_angle += 0.01f;
+	_angle += 0.001f;
 	_mappedTransform->world =  XMMatrixRotationY(_angle);
 }
 void 

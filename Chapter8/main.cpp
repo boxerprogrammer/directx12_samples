@@ -131,7 +131,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
-	_cmdList->Close();
+
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;//タイムアウトなし
 	cmdQueueDesc.NodeMask = 0;
@@ -566,7 +566,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		worldMat=XMMatrixRotationY(angle);
 		mapMatrix->world = worldMat;
 		mapMatrix->viewproj = viewMat * projMat;
-		angle += 0.05f;
+		angle += 0.005f;
 
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -632,18 +632,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		////待ち
 		_cmdQueue->Signal(_fence, ++_fenceVal);
 
-		if (_fence->GetCompletedValue() != _fenceVal) {
-			auto event = CreateEvent(nullptr, false, false, nullptr);
-			_fence->SetEventOnCompletion(_fenceVal, event);
-			WaitForSingleObject(event, INFINITE);
-			CloseHandle(event);
+		while (_fence->GetCompletedValue() != _fenceVal) {
+			;
 		}
-		_cmdAllocator->Reset();//キューをクリア
-		_cmdList->Reset(_cmdAllocator, nullptr);//再びコマンドリストをためる準備
 		
 
 		//フリップ
 		_swapchain->Present(1, 0);
+		_cmdAllocator->Reset();//キューをクリア
+		_cmdList->Reset(_cmdAllocator, nullptr);//再びコマンドリストをためる準備
+
 
 	}
 	//もうクラス使わんから登録解除してや
