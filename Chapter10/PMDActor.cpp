@@ -48,6 +48,15 @@ PMDActor::Transform::operator new(size_t size) {
 	return _aligned_malloc(size, 16);
 }
 
+void
+PMDActor::RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat) {
+	_boneMatrices[node->boneIdx] = mat;
+	for (auto& cnode : node->children) {
+		RecursiveMatrixMultipy(cnode, _boneMatrices[cnode->boneIdx] * mat);
+	}
+}
+
+
 PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
 	_renderer(renderer),
 	_dx12(renderer._dx12),
@@ -58,6 +67,26 @@ PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
 	CreateTransformView();
 	CreateMaterialData();
 	CreateMaterialAndTextureView();
+
+	auto armNode=_boneNodeTable["左腕"];
+	auto& armpos = armNode.startPos;
+	auto armMat = XMMatrixTranslation(-armpos.x, -armpos.y, -armpos.z)*
+									XMMatrixRotationZ(XM_PIDIV2)*
+									XMMatrixTranslation(armpos.x, armpos.y, armpos.z);
+	
+	auto elbowNode = _boneNodeTable["左ひじ"];
+	auto& elbowPos = elbowNode.startPos;
+	auto elbowMat = XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)*
+									XMMatrixRotationZ(-XM_PIDIV2)*
+									XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
+
+	_boneMatrices[armNode.boneIdx] = armMat;
+	_boneMatrices[elbowNode.boneIdx] = elbowMat;
+
+
+	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
+
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
 
@@ -256,17 +285,41 @@ PMDActor::LoadPMDFile(const char* path) {
 		XMFLOAT3 pos;//ボーンの基準点座標
 	};
 #pragma pack()
-	vector<Bone> bones(boneNum);
-	fread(bones.data(), sizeof(Bone), boneNum, fp);
+	vector<Bone> pmdBones(boneNum);
+	fread(pmdBones.data(), sizeof(Bone), boneNum, fp);
 	fclose(fp);
 
+	//インデックスと名前の対応関係構築のために後で使う
+	vector<string> boneNames(pmdBones.size());
+	//ボーンノードマップを作る
+	for (int idx = 0; idx < pmdBones.size(); ++idx) {
+		auto& pb = pmdBones[idx];
+		boneNames[idx] = pb.boneName;
+		auto& node = _boneNodeTable[pb.boneName];
+		node.boneIdx = idx;
+		node.startPos = pb.pos;
+	}
+	//親子関係を構築する
+	for (auto& pb : pmdBones) {
+		//親インデックスをチェック(あり得ない番号なら飛ばす)
+		if (pb.parentNo >= pmdBones.size()) {
+			continue;
+		}
+		auto parentName = boneNames[pb.parentNo];
+		_boneNodeTable[parentName].children.emplace_back(&_boneNodeTable[pb.boneName]);
+	}
+	_boneMatrices.resize(pmdBones.size());
+	
+	//ボーンをすべて初期化する。
+	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
 }
 
 HRESULT 
 PMDActor::CreateTransformView() {
 	//GPUバッファ作成
-	auto buffSize = sizeof(Transform);
+	auto buffSize = sizeof(XMMATRIX)*(1 + _boneMatrices.size());
 	buffSize = (buffSize + 0xff)&~0xff;
+
 	auto result = _dx12.Device()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -281,12 +334,13 @@ PMDActor::CreateTransformView() {
 	}
 
 	//マップとコピー
-	result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
+	result = _transformBuff->Map(0, nullptr, (void**)&_mappedMatrices);
 	if (FAILED(result)) {
 		assert(SUCCEEDED(result));
 		return result;
 	}
-	*_mappedTransform = _transform;
+	_mappedMatrices[0] = _transform.world;
+	std::copy(_boneMatrices.begin() ,_boneMatrices.end(),_mappedMatrices+1);
 
 	//ビューの作成
 	D3D12_DESCRIPTOR_HEAP_DESC transformDescHeapDesc = {};
@@ -421,8 +475,8 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-	_angle += 0.001f;
-	_mappedTransform->world =  XMMatrixRotationY(_angle);
+	//_angle += 0.001f;
+	_mappedMatrices[0] =  XMMatrixRotationY(_angle);
 }
 void 
 PMDActor::Draw() {

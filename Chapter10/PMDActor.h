@@ -3,6 +3,7 @@
 #include<d3d12.h>
 #include<DirectXMath.h>
 #include<vector>
+#include<map>
 #include<wrl.h>
 
 class Dx12Wrapper;
@@ -54,7 +55,7 @@ private:
 	};
 
 	Transform _transform;
-	Transform* _mappedTransform = nullptr;
+	DirectX::XMMATRIX* _mappedMatrices = nullptr;
 	ComPtr<ID3D12Resource> _transformBuff = nullptr;
 
 	//マテリアル関連
@@ -64,6 +65,17 @@ private:
 	std::vector<ComPtr<ID3D12Resource>> _sphResources;
 	std::vector<ComPtr<ID3D12Resource>> _spaResources;
 	std::vector<ComPtr<ID3D12Resource>> _toonResources;
+
+	//ボーン関連
+	std::vector<DirectX::XMMATRIX> _boneMatrices;
+
+	struct BoneNode {
+		int boneIdx;//ボーンインデックス
+		DirectX::XMFLOAT3 startPos;//ボーン基準点(回転中心)
+		std::vector<BoneNode*> children;//子ノード
+	};
+	std::map<std::string, BoneNode> _boneNodeTable;
+
 	
 	//読み込んだマテリアルをもとにマテリアルバッファを作成
 	HRESULT CreateMaterialData();
@@ -77,7 +89,7 @@ private:
 
 	//PMDファイルのロード
 	HRESULT LoadPMDFile(const char* path);
-
+	void RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat);
 	float _angle;//テスト用Y軸回転
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);
