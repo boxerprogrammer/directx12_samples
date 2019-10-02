@@ -85,7 +85,7 @@ PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
 
 
 	RecursiveMatrixMultipy(&_boneNodeTable["ÉZÉìÉ^Å["], XMMatrixIdentity());
-
+	XMMatrixRotationQuaternion()
 	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
