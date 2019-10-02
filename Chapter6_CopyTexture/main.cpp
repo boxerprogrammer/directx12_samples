@@ -52,6 +52,15 @@ ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
 
+///アライメントに揃えたサイズを返す
+///@param size 元のサイズ
+///@param alignment アライメントサイズ
+///@return アライメントをそろえたサイズ
+size_t
+AlignmentedSize(size_t size, size_t alignment) {
+	return size + alignment - size % alignment;
+}
+
 void EnableDebugLayer() {
 	ID3D12Debug* debugLayer = nullptr;
 	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
@@ -427,7 +436,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//WICテクスチャのロード
 	TexMetadata metadata = {};
 	ScratchImage scratchImg = {};
-	result = LoadFromWICFile(L"img/textest.png", WIC_FLAGS_NONE, &metadata, scratchImg);
+	result = LoadFromWICFile(L"img/textest200x200.png", WIC_FLAGS_NONE, &metadata, scratchImg);
 	auto img = scratchImg.GetImage(0, 0, 0);//生データ抽出
 
 
@@ -443,7 +452,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	resDesc.Format = DXGI_FORMAT_UNKNOWN;
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;//単なるバッファとして
 	auto pixelsize = scratchImg.GetPixelsSize();
-	resDesc.Width = img->slicePitch;//データサイズ
+	resDesc.Width = AlignmentedSize(img->rowPitch,D3D12_TEXTURE_DATA_PITCH_ALIGNMENT)*img->height;//データサイズ
 	resDesc.Height = 1;//
 	resDesc.DepthOrArraySize = 1;//
 	resDesc.MipLevels = 1;
@@ -493,7 +502,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	);
 	uint8_t* mapforImg = nullptr;//image->pixelsと同じ型にする
 	result = uploadbuff->Map(0, nullptr, (void**)&mapforImg);//マップ
-	std::copy_n(img->pixels, img->slicePitch, mapforImg);//コピー
+	auto srcAddress = img->pixels;
+	auto rowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	for (int y = 0; y < img->height; ++y) {
+		std::copy_n(srcAddress,
+				rowPitch, 
+				mapforImg);//コピー
+		//1行ごとの辻褄を合わせてやる
+		srcAddress += img->rowPitch;
+		mapforImg += rowPitch;
+	}
 	uploadbuff->Unmap(0, nullptr);//アンマップ
 
 	D3D12_TEXTURE_COPY_LOCATION src = {}, dst = {};
@@ -513,7 +531,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	src.PlacedFootprint.Footprint.Width = metadata.width;
 	src.PlacedFootprint.Footprint.Height = metadata.height;
 	src.PlacedFootprint.Footprint.Depth = metadata.depth;
-	src.PlacedFootprint.Footprint.RowPitch = img->rowPitch;
+	src.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch,D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 	src.PlacedFootprint.Footprint.Format = img->format;
 
 	
