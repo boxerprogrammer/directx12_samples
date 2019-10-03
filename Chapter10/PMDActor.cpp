@@ -68,25 +68,11 @@ PMDActor::PMDActor(const char* filepath,PMDRenderer& renderer):
 	CreateMaterialData();
 	CreateMaterialAndTextureView();
 
-	auto armNode=_boneNodeTable["左腕"];
-	auto& armpos = armNode.startPos;
-	auto armMat = XMMatrixTranslation(-armpos.x, -armpos.y, -armpos.z)*
-									XMMatrixRotationZ(XM_PIDIV2)*
-									XMMatrixTranslation(armpos.x, armpos.y, armpos.z);
-	
-	auto elbowNode = _boneNodeTable["左ひじ"];
-	auto& elbowPos = elbowNode.startPos;
-	auto elbowMat = XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)*
-									XMMatrixRotationZ(-XM_PIDIV2)*
-									XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
-
-	_boneMatrices[armNode.boneIdx] = armMat;
-	_boneMatrices[elbowNode.boneIdx] = elbowMat;
 
 
-	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
-	XMMatrixRotationQuaternion()
-	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
+	//RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
+	//XMMatrixRotationQuaternion()
+	//copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
 
@@ -94,6 +80,61 @@ PMDActor::~PMDActor()
 {
 }
 
+void 
+PMDActor::LoadVMDFile(const char* filepath, const char* name) {
+	auto fp = fopen(filepath, "rb");
+	fseek(fp, 50, SEEK_SET);//最初の50バイトは飛ばしてOK
+	unsigned int keyframeNum = 0;
+	fread(&keyframeNum, sizeof(keyframeNum), 1, fp);
+
+	struct VMDKeyFrame {
+		char boneName[15]; // ボーン名
+		unsigned int frameNo; // フレーム番号(読込時は現在のフレーム位置を0とした相対位置)
+		XMFLOAT3 location; // 位置
+		XMFLOAT4 quaternion; // Quaternion // 回転
+		unsigned char bezier[64]; // [4][4][4]  ベジェ補完パラメータ
+	};
+	vector<VMDKeyFrame> keyframes(keyframeNum);
+	for (auto& keyframe : keyframes) {
+		fread(keyframe.boneName, sizeof(keyframe.boneName), 1, fp);//ボーン名
+		fread(&keyframe.frameNo, sizeof(keyframe.frameNo) +//フレーム番号
+			sizeof(keyframe.location) +//位置(IKのときに使用予定)
+			sizeof(keyframe.quaternion) +//クオータニオン
+			sizeof(keyframe.bezier), 1, fp);//補間ベジェデータ
+	}
+
+	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
+	for (auto& f : keyframes) {
+		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion)));
+	}
+
+	for (auto& bonemotion : _motiondata) {
+		auto node = _boneNodeTable[bonemotion.first];
+		auto& pos = node.startPos;
+		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
+			XMMatrixRotationQuaternion(bonemotion.second[0].quaternion)*
+			XMMatrixTranslation(pos.x, pos.y, pos.z);
+		_boneMatrices[node.boneIdx] = mat;
+	}
+	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
+	//auto armNode = _boneNodeTable["左腕"];
+	//auto& armpos = armNode.startPos;
+	//auto armMat = XMMatrixTranslation(-armpos.x, -armpos.y, -armpos.z)*
+	//	XMMatrixRotationZ(XM_PIDIV2)*
+	//	XMMatrixTranslation(armpos.x, armpos.y, armpos.z);
+
+	//auto elbowNode = _boneNodeTable["左ひじ"];
+	//auto& elbowPos = elbowNode.startPos;
+	//auto elbowMat = XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)*
+	//	XMMatrixRotationZ(-XM_PIDIV2)*
+	//	XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
+
+	//_boneMatrices[armNode.boneIdx] = armMat;
+	//_boneMatrices[elbowNode.boneIdx] = elbowMat;
+
+
+}
 
 HRESULT
 PMDActor::LoadPMDFile(const char* path) {

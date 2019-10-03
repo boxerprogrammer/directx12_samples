@@ -4,6 +4,7 @@
 #include<DirectXMath.h>
 #include<vector>
 #include<map>
+#include<unordered_map>
 #include<wrl.h>
 
 class Dx12Wrapper;
@@ -91,11 +92,22 @@ private:
 	HRESULT LoadPMDFile(const char* path);
 	void RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat);
 	float _angle;//テスト用Y軸回転
+
+
+	///キーフレーム構造体
+	struct KeyFrame {
+		unsigned int frameNo;//フレーム№(アニメーション開始からの経過時間)
+		DirectX::XMVECTOR quaternion;//クォータニオン
+		KeyFrame(unsigned int fno, DirectX::XMVECTOR& q):frameNo(fno),quaternion(q) {}
+	};
+	std::unordered_map<std::string, std::vector<KeyFrame>> _motiondata;
+
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);
 	~PMDActor();
 	///クローンは頂点およびマテリアルは共通のバッファを見るようにする
 	PMDActor* Clone();
+	void LoadVMDFile(const char* filepath, const char* name);
 	void Update();
 	void Draw();
 
