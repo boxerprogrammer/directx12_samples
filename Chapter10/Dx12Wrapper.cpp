@@ -402,8 +402,8 @@ Dx12Wrapper::CreateSceneView(){
 	_mappedSceneData = nullptr;//マップ先を示すポインタ
 	result = _sceneConstBuff->Map(0, nullptr, (void**)&_mappedSceneData);//マップ
 	
-	XMFLOAT3 eye(0, 15, -15);
-	XMFLOAT3 target(0, 15, 0);
+	XMFLOAT3 eye(0, 15, -30);
+	XMFLOAT3 target(0, 10, 0);
 	XMFLOAT3 up(0, 1, 0);
 	_mappedSceneData->view = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
 	_mappedSceneData->proj = XMMatrixPerspectiveFovLH(XM_PIDIV4,//画角は45°

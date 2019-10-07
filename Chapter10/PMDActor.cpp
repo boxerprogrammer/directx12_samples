@@ -2,9 +2,12 @@
 #include"PMDRenderer.h"
 #include"Dx12Wrapper.h"
 #include<d3dx12.h>
+#include<sstream>
 using namespace Microsoft::WRL;
 using namespace std;
 using namespace DirectX;
+
+#pragma comment(lib,"winmm.lib")
 
 namespace {
 	///テクスチャのパスをセパレータ文字で分離する
@@ -134,6 +137,40 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 	//_boneMatrices[elbowNode.boneIdx] = elbowMat;
 
 
+}
+
+void 
+PMDActor::PlayAnimation() {
+	_startTime = timeGetTime();
+}
+void 
+PMDActor::MotionUpdate() {
+
+	auto elapsedTime = timeGetTime() - _startTime;//経過時間を測る
+	unsigned int frameNo = 30 * (elapsedTime / 1000.0f);
+
+
+	//行列情報クリア(してないと前フレームのポーズが重ね掛けされてモデルが壊れる)
+	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
+
+	//モーションデータ更新
+	for (auto& bonemotion : _motiondata) {
+		auto node = _boneNodeTable[bonemotion.first];
+		//合致するものを探す
+		auto keyframes = bonemotion.second;
+
+		auto it=find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
+			return keyframe.frameNo <= frameNo;
+		});
+		if (it == keyframes.rend())continue;//合致するものがなければ飛ばす
+		auto& pos = node.startPos;
+		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
+			XMMatrixRotationQuaternion(it->quaternion)*//合致したクォータニオンを使用
+			XMMatrixTranslation(pos.x, pos.y, pos.z);
+		_boneMatrices[node.boneIdx] = mat;
+	}
+	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
 HRESULT
@@ -518,6 +555,7 @@ void
 PMDActor::Update() {
 	//_angle += 0.001f;
 	_mappedMatrices[0] =  XMMatrixRotationY(_angle);
+	MotionUpdate();
 }
 void 
 PMDActor::Draw() {

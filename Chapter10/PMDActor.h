@@ -102,6 +102,10 @@ private:
 	};
 	std::unordered_map<std::string, std::vector<KeyFrame>> _motiondata;
 
+	DWORD _startTime;//アニメーション開始時点のミリ秒時刻
+	
+	void MotionUpdate();
+
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);
 	~PMDActor();
@@ -110,6 +114,6 @@ public:
 	void LoadVMDFile(const char* filepath, const char* name);
 	void Update();
 	void Draw();
-
+	void PlayAnimation();
 };
 

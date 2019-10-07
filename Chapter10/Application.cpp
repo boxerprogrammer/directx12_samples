@@ -100,8 +100,9 @@ Application::Init() {
 	_dx12.reset(new Dx12Wrapper(_hwnd));
 	_pmdRenderer.reset(new PMDRenderer(*_dx12));
 	_pmdActor.reset(new PMDActor("Model/‰‰¹ƒ~ƒN.pmd", *_pmdRenderer));
-	_pmdActor->LoadVMDFile("motion/pose.vmd", "pose");
+	_pmdActor->LoadVMDFile("motion/swing.vmd", "pose");
 	_dx12->ExecuteCommand();
+	_pmdActor->PlayAnimation();
 	return true;
 }
 
