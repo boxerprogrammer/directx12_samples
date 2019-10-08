@@ -111,6 +111,13 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion)));
 	}
 
+	for (auto& motion : _motiondata) {
+		sort(motion.second.begin(),motion.second.end(),
+			[](const KeyFrame& lval,const KeyFrame& rval){
+				return lval.frameNo <= rval.frameNo;
+			});
+	}
+
 	for (auto& bonemotion : _motiondata) {
 		auto node = _boneNodeTable[bonemotion.first];
 		auto& pos = node.startPos;
@@ -121,21 +128,6 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 	}
 	RecursiveMatrixMultipy(&_boneNodeTable["ƒZƒ“ƒ^["], XMMatrixIdentity());
 	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
-	//auto armNode = _boneNodeTable["¶˜r"];
-	//auto& armpos = armNode.startPos;
-	//auto armMat = XMMatrixTranslation(-armpos.x, -armpos.y, -armpos.z)*
-	//	XMMatrixRotationZ(XM_PIDIV2)*
-	//	XMMatrixTranslation(armpos.x, armpos.y, armpos.z);
-
-	//auto elbowNode = _boneNodeTable["¶‚Ð‚¶"];
-	//auto& elbowPos = elbowNode.startPos;
-	//auto elbowMat = XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)*
-	//	XMMatrixRotationZ(-XM_PIDIV2)*
-	//	XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
-
-	//_boneMatrices[armNode.boneIdx] = armMat;
-	//_boneMatrices[elbowNode.boneIdx] = elbowMat;
-
 
 }
 
