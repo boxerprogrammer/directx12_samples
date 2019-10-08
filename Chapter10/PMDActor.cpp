@@ -159,14 +159,27 @@ PMDActor::MotionUpdate() {
 		//合致するものを探す
 		auto keyframes = bonemotion.second;
 
-		auto it=find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
+		auto rit=find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
 			return keyframe.frameNo <= frameNo;
 		});
-		if (it == keyframes.rend())continue;//合致するものがなければ飛ばす
+		if (rit == keyframes.rend())continue;//合致するものがなければ飛ばす
+		XMMATRIX rotation;
+		auto it = rit.base();
+		if (it != keyframes.end()) {
+			auto t = static_cast<float>(frameNo - rit->frameNo) / 
+					static_cast<float>(it->frameNo - rit->frameNo);
+			rotation = XMMatrixRotationQuaternion(
+						XMQuaternionSlerp(rit->quaternion,it->quaternion,t)
+					);
+		}
+		else {
+			rotation=XMMatrixRotationQuaternion(rit->quaternion);
+		}
+
 		auto& pos = node.startPos;
-		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
-			XMMatrixRotationQuaternion(it->quaternion)*//合致したクォータニオンを使用
-			XMMatrixTranslation(pos.x, pos.y, pos.z);
+		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*//原点に戻し
+			rotation*//回転
+			XMMatrixTranslation(pos.x, pos.y, pos.z);//元の座標に戻す
 		_boneMatrices[node.boneIdx] = mat;
 	}
 	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
