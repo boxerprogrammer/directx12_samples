@@ -98,9 +98,16 @@ private:
 	struct KeyFrame {
 		unsigned int frameNo;//フレーム№(アニメーション開始からの経過時間)
 		DirectX::XMVECTOR quaternion;//クォータニオン
-		KeyFrame(unsigned int fno, DirectX::XMVECTOR& q):frameNo(fno),quaternion(q) {}
+		DirectX::XMFLOAT2 p1, p2;//ベジェの中間コントロールポイント
+		KeyFrame(unsigned int fno, DirectX::XMVECTOR& q,const DirectX::XMFLOAT2& ip1,const DirectX::XMFLOAT2& ip2):
+			frameNo(fno),
+			quaternion(q),
+			p1(ip1),
+			p2(ip2){}
 	};
 	std::unordered_map<std::string, std::vector<KeyFrame>> _motiondata;
+
+	float GetYFromXOnBezier(float x,const DirectX::XMFLOAT2& a,const DirectX::XMFLOAT2& b, uint8_t n = 12);
 
 	DWORD _startTime;//アニメーション開始時点のミリ秒時刻
 	

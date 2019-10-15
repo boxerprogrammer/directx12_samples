@@ -46,6 +46,30 @@ namespace {
 	}
 }
 
+float 
+PMDActor::GetYFromXOnBezier(float x, const XMFLOAT2& a, const XMFLOAT2& b, uint8_t n) {
+	if (a.x == a.y&&b.x == b.y)return x;//計算不要
+	float t = x;
+	const float k0 = 1 + 3 * a.x - 3 * b.x;//t^3の係数
+	const float k1 = 3 * b.x - 6 * a.x;//t^2の係数
+	const float k2 = 3 * a.x;//tの係数
+
+	//誤差の範囲内かどうかに使用する定数
+	constexpr float epsilon = 0.0005f;
+
+	for (int i = 0; i < n; ++i) {
+		//f(t)求めまーす
+		auto ft = k0 * t*t*t + k1 * t*t + k2 * t - x;
+		//もし結果が0に近い(誤差の範囲内)なら打ち切り
+		if (ft <= epsilon && ft >= -epsilon)break;
+
+		t -= ft / 2;
+	}
+	//既に求めたいtは求めているのでyを計算する
+	auto r = 1 - t;
+	return t * t*t + 3 * t*t*r*b.y + 3 * t*r*r*a.y;
+}
+
 void* 
 PMDActor::Transform::operator new(size_t size) {
 	return _aligned_malloc(size, 16);
@@ -108,7 +132,9 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 
 	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
 	for (auto& f : keyframes) {
-		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion)));
+		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion),
+			XMFLOAT2((float)f.bezier[3]/127.0f,(float)f.bezier[7]/127.0f),
+			XMFLOAT2((float)f.bezier[11] / 127.0f, (float)f.bezier[15] / 127.0f)));
 	}
 
 	for (auto& motion : _motiondata) {
@@ -158,8 +184,10 @@ PMDActor::MotionUpdate() {
 		XMMATRIX rotation;
 		auto it = rit.base();
 		if (it != keyframes.end()) {
-			auto t = static_cast<float>(frameNo - rit->frameNo) / 
-					static_cast<float>(it->frameNo - rit->frameNo);
+		auto t = static_cast<float>(frameNo - rit->frameNo) / 
+				static_cast<float>(it->frameNo - rit->frameNo);
+		t = GetYFromXOnBezier(t, it->p1, it->p2, 12);
+
 			rotation = XMMatrixRotationQuaternion(
 						XMQuaternionSlerp(rit->quaternion,it->quaternion,t)
 					);
