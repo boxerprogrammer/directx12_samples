@@ -48,34 +48,34 @@ Output BasicVS(float4 pos : POSITION , float4 normal : NORMAL, float2 uv : TEXCO
 	output.normal = mul(world,normal);//法線にもワールド変換を行う
 	output.vnormal = mul(view, output.normal);
 	output.uv = uv;
-	output.ray = normalize(pos.xyz - mul(view,eye));//視線ベクトル
+	output.ray = normalize(output.pos.xyz - mul(view,eye));//視線ベクトル
 
 	return output;
 }
 
-float4 BasicPS(Output input ) : SV_TARGET{
+float4 BasicPS(Output input) : SV_TARGET{
 	float3 light = normalize(float3(1,-1,1));//光の向かうベクトル(平行光線)
 	float3 lightColor = float3(1,1,1);//ライトのカラー(1,1,1で真っ白)
 
 	//ディフューズ計算
 	float diffuseB = saturate(dot(-light, input.normal));
-	float4 toonDif =  toon.Sample(smpToon, float2(0, 1.0 - diffuseB));
+	float4 toonDif = toon.Sample(smpToon, float2(0, 1.0 - diffuseB));
 
 	//光の反射ベクトル
-	float3 refLight= normalize(reflect(light, input.normal.xyz));
+	float3 refLight = normalize(reflect(light, input.normal.xyz));
 	float specularB = pow(saturate(dot(refLight, -input.ray)),specular.a);
-	
+
 	//スフィアマップ用UV
 	float2 sphereMapUV = input.vnormal.xy;
 	sphereMapUV = (sphereMapUV + float2(1, -1)) * float2(0.5, -0.5);
 
+	float4 ambCol = float4(ambient*0.6, 1);
 	float4 texColor = tex.Sample(smp, input.uv); //テクスチャカラー
-
-	return saturate(toonDif//輝度(トゥーン)
-		* diffuse//ディフューズ色
+	return saturate((toonDif//輝度(トゥーン)
+		* diffuse + ambCol)//ディフューズ色
 		*texColor//テクスチャカラー
-		*sph.Sample(smp, sphereMapUV))//スフィアマップ(乗算)
-		+ saturate(spa.Sample(smp, sphereMapUV)*texColor//スフィアマップ(加算)
-		+ float4(specularB *specular.rgb, 1))//スペキュラー
-		+ float4(texColor*ambient*0.5,1);//アンビエント(明るくなりすぎるので0.5にしてます)
+		*sph.Sample(smp, sphereMapUV)//スフィアマップ(乗算)
+		+ spa.Sample(smp, sphereMapUV)//スフィアマップ(加算)
+		+ float4(specularB *specular.rgb, 1)//スペキュラー
+		);
 }
