@@ -2,6 +2,7 @@
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<map>
+#include<unordered_map>
 #include<DirectXTex.h>
 #include<wrl.h>
 #include<string>
@@ -69,7 +70,7 @@ class Dx12Wrapper
 	using LoadLambda_t = std::function<HRESULT(const std::wstring& path, DirectX::TexMetadata*, DirectX::ScratchImage&)>;
 	std::map < std::string, LoadLambda_t> _loadLambdaTable;
 	//テクスチャテーブル
-	std::map<std::string,ComPtr<ID3D12Resource>> _textureTable;
+	std::unordered_map<std::string,ComPtr<ID3D12Resource>> _textureTable;
 	//テクスチャローダテーブルの作成
 	void CreateTextureLoaderTable();
 	//テクスチャ名からテクスチャバッファ作成、中身をコピー
