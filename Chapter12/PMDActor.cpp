@@ -132,7 +132,7 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 
 	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
 	for (auto& f : keyframes) {
-		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion),
+		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion),f.location,
 			XMFLOAT2((float)f.bezier[3]/127.0f,(float)f.bezier[7]/127.0f),
 			XMFLOAT2((float)f.bezier[11] / 127.0f, (float)f.bezier[15] / 127.0f)));
 	}
@@ -398,8 +398,36 @@ PMDActor::LoadPMDFile(const char* path) {
 #pragma pack()
 	vector<Bone> pmdBones(boneNum);
 	fread(pmdBones.data(), sizeof(Bone), boneNum, fp);
+	
+
+	uint16_t ikNum=0;
+	fread(&ikNum, sizeof(ikNum), 1, fp);
+
+	struct PMDIK {
+		uint16_t boneIdx;//IK対象のボーンを示す
+		uint16_t targetIdx;//ターゲットに近づけるためのボーンのインデックス
+		uint16_t iterations;//試行回数
+		float limit;//一回当たりの回転制限
+		vector<uint16_t> nodeIdxes;//間のノード番号
+	};
+	vector<PMDIK> pmdIkData(ikNum);
+	for (auto& ik : pmdIkData) {
+		fread(&ik.boneIdx, sizeof(ik.boneIdx), 1, fp);
+		fread(&ik.targetIdx, sizeof(ik.targetIdx), 1, fp);
+		uint8_t chainLen = 0;
+		fread(&chainLen, sizeof(chainLen), 1, fp);
+		ik.nodeIdxes.resize(chainLen);
+		fread(&ik.iterations, sizeof(ik.iterations), 1, fp);
+		fread(&ik.limit, sizeof(ik.limit), 1, fp);
+		if (chainLen == 0)continue;//間ノード数が0ならばここで終わり
+		fread(ik.nodeIdxes.data(), sizeof(ik.nodeIdxes[0]),chainLen, fp);
+	}
+
 	fclose(fp);
 
+	//読み込み後の処理
+
+	//ボーン情報構築
 	//インデックスと名前の対応関係構築のために後で使う
 	vector<string> boneNames(pmdBones.size());
 	//ボーンノードマップを作る
@@ -423,6 +451,29 @@ PMDActor::LoadPMDFile(const char* path) {
 	
 	//ボーンをすべて初期化する。
 	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
+
+
+
+	//IKデバッグ用
+	auto getNameFromIdx = [&](uint16_t idx)->string {
+		auto it = find_if(_boneNodeTable.begin(), _boneNodeTable.end(), [idx](const pair<string, BoneNode>& obj) {
+			return obj.second.boneIdx == idx;
+		});
+		if (it != _boneNodeTable.end()) {
+			return it->first;
+		}
+		else {
+			return "";
+		}
+	};
+	for (auto& ik : pmdIkData) {
+		std::ostringstream oss;
+		oss << "IKボーン番号=" << ik.boneIdx << ":" << getNameFromIdx(ik.boneIdx) << endl;
+		for (auto& node : ik.nodeIdxes) {
+			oss << "\tノードボーン=" << node << ":" << getNameFromIdx(node)<<endl;
+		}
+		OutputDebugString(oss.str().c_str());
+	}
 }
 
 HRESULT 
