@@ -13,8 +13,10 @@ class PMDActor
 {
 	friend PMDRenderer;
 private:
+	unsigned int _duration = 0;
 	PMDRenderer& _renderer;
 	Dx12Wrapper& _dx12;
+	DirectX::XMMATRIX _localMat;
 	template<typename T>
 	using ComPtr = Microsoft::WRL::ComPtr<T>;
 	
@@ -75,8 +77,19 @@ private:
 		DirectX::XMFLOAT3 startPos;//ボーン基準点(回転中心)
 		std::vector<BoneNode*> children;//子ノード
 	};
-	std::map<std::string, BoneNode> _boneNodeTable;
+	std::unordered_map<std::string, BoneNode> _boneNodeTable;
 
+	std::vector<BoneNode*> _boneNodeAddressArray;
+
+
+	struct PMDIK {
+		uint16_t boneIdx;//IK対象のボーンを示す
+		uint16_t targetIdx;//ターゲットに近づけるためのボーンのインデックス
+		uint16_t iterations;//試行回数
+		float limit;//一回当たりの回転制限
+		std::vector<uint16_t> nodeIdxes;//間のノード番号
+	};
+	std::vector<PMDIK> _ikData;
 	
 	//読み込んだマテリアルをもとにマテリアルバッファを作成
 	HRESULT CreateMaterialData();
@@ -115,6 +128,8 @@ private:
 	
 	void MotionUpdate();
 
+	void SolveCCDIK(uint16_t boneIdx);
+
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);
 	~PMDActor();
@@ -124,5 +139,7 @@ public:
 	void Update();
 	void Draw();
 	void PlayAnimation();
+
+	void LookAt(float x,float y, float z);
 };
 
