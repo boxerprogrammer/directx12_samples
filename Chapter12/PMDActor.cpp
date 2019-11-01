@@ -76,10 +76,10 @@ PMDActor::Transform::operator new(size_t size) {
 }
 
 void
-PMDActor::RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat) {
-	_boneMatrices[node->boneIdx] = mat;
+PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat) {
+	_boneMatrices[node->boneIdx] *= mat;
 	for (auto& cnode : node->children) {
-		RecursiveMatrixMultipy(cnode, _boneMatrices[cnode->boneIdx] * mat);
+		RecursiveMatrixMultipy(cnode, _boneMatrices[node->boneIdx]);
 	}
 }
 
@@ -140,12 +140,17 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 	for (auto& motion : _motiondata) {
 		sort(motion.second.begin(),motion.second.end(),
 			[](const KeyFrame& lval,const KeyFrame& rval){
-				return lval.frameNo <= rval.frameNo;
+				return lval.frameNo < rval.frameNo;
 			});
 	}
 
 	for (auto& bonemotion : _motiondata) {
-		auto node = _boneNodeTable[bonemotion.first];
+		auto& boneName = bonemotion.first;
+		auto itBoneNode = _boneNodeTable.find(boneName);
+		if (itBoneNode == _boneNodeTable.end()) {
+			continue;
+		}
+		auto& node = itBoneNode->second;
 		auto& pos = node.startPos;
 		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
 			XMMatrixRotationQuaternion(bonemotion.second[0].quaternion)*
@@ -173,24 +178,30 @@ PMDActor::MotionUpdate() {
 
 	//モーションデータ更新
 	for (auto& bonemotion : _motiondata) {
-		auto node = _boneNodeTable[bonemotion.first];
+		auto& boneName = bonemotion.first;
+		auto itBoneNode = _boneNodeTable.find(boneName);
+		if (itBoneNode == _boneNodeTable.end()) {
+			continue;
+		}
+		auto node = itBoneNode->second;
 		//合致するものを探す
 		auto keyframes = bonemotion.second;
 
 		auto rit=find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
-			return keyframe.frameNo <= frameNo;
+			return keyframe.frameNo < frameNo;
 		});
 		if (rit == keyframes.rend())continue;//合致するものがなければ飛ばす
-		XMMATRIX rotation;
+		XMMATRIX rotation=XMMatrixIdentity();
+		XMVECTOR offset = XMLoadFloat3(&rit->offset); 
 		auto it = rit.base();
 		if (it != keyframes.end()) {
-		auto t = static_cast<float>(frameNo - rit->frameNo) / 
-				static_cast<float>(it->frameNo - rit->frameNo);
-		t = GetYFromXOnBezier(t, it->p1, it->p2, 12);
-
+			auto t = static_cast<float>(frameNo - rit->frameNo) / 
+					static_cast<float>(it->frameNo - rit->frameNo);
+			t = GetYFromXOnBezier(t, it->p1, it->p2, 12);
 			rotation = XMMatrixRotationQuaternion(
 						XMQuaternionSlerp(rit->quaternion,it->quaternion,t)
 					);
+			offset = XMVectorLerp(offset, XMLoadFloat3(&it->offset), t);
 		}
 		else {
 			rotation=XMMatrixRotationQuaternion(rit->quaternion);
@@ -200,7 +211,7 @@ PMDActor::MotionUpdate() {
 		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*//原点に戻し
 			rotation*//回転
 			XMMatrixTranslation(pos.x, pos.y, pos.z);//元の座標に戻す
-		_boneMatrices[node.boneIdx] = mat;
+		_boneMatrices[node.boneIdx] =mat*XMMatrixTranslationFromVector(offset);
 	}
 	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
 	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);

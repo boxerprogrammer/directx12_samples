@@ -90,7 +90,7 @@ private:
 
 	//PMDファイルのロード
 	HRESULT LoadPMDFile(const char* path);
-	void RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat);
+	void RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat);
 	float _angle;//テスト用Y軸回転
 
 
