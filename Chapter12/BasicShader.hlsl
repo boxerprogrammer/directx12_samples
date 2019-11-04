@@ -72,7 +72,7 @@ float4 BasicPS(Output input) : SV_TARGET{
 	float4 ambCol = float4(ambient*0.6, 1);
 	float4 texColor = tex.Sample(smp, input.uv); //テクスチャカラー
 	return saturate((toonDif//輝度(トゥーン)
-		* diffuse + ambCol)//ディフューズ色
+		* diffuse + ambCol*0.5)//ディフューズ色
 		*texColor//テクスチャカラー
 		*sph.Sample(smp, sphereMapUV)//スフィアマップ(乗算)
 		+ spa.Sample(smp, sphereMapUV)//スフィアマップ(加算)

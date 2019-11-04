@@ -73,11 +73,14 @@ private:
 	std::vector<DirectX::XMMATRIX> _boneMatrices;
 
 	struct BoneNode {
-		int boneIdx;//ボーンインデックス
+		uint32_t boneIdx;//ボーンインデックス
+		uint32_t boneType;//ボーン種別
+		uint32_t ikParentBone;//IK親ボーン
 		DirectX::XMFLOAT3 startPos;//ボーン基準点(回転中心)
 		std::vector<BoneNode*> children;//子ノード
 	};
 	std::unordered_map<std::string, BoneNode> _boneNodeTable;
+	std::vector<std::string> _boneNameArray;//インデックスから名前を検索しやすいようにしておく
 
 	std::vector<BoneNode*> _boneNodeAddressArray;
 
@@ -129,6 +132,9 @@ private:
 	void MotionUpdate();
 
 	void SolveCCDIK(uint16_t boneIdx);
+	void SolveCosineIK(const PMDIK& ik);
+
+	void IKSolve();
 
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);

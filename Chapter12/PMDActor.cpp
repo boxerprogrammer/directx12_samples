@@ -3,6 +3,7 @@
 #include"Dx12Wrapper.h"
 #include<d3dx12.h>
 #include<sstream>
+#include<array>
 using namespace Microsoft::WRL;
 using namespace std;
 using namespace DirectX;
@@ -89,12 +90,98 @@ namespace {
 		XMMATRIX tmp = LookAtMatrix(origin, up, right);
 		return XMMatrixTranspose(tmp)*LookAtMatrix(lookat, up, right);
 	}
+	//ボーン種別
+	enum class BoneType {
+		Rotation,//回転
+		RotAndMove,//回転＆移動
+		IK,//IK
+		Undefined,//未定義
+		IKChild,//IK影響ボーン
+		RotationChild,//回転影響ボーン
+		IKDestination,//IK接続先
+		Invisible//見えないボーン
+	};
 
 }
 
 void
 PMDActor::LookAt(float x, float y, float z) {
 	_localMat = LookAtMatrix(XMFLOAT3(x, y, z), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
+}
+
+
+void 
+PMDActor::SolveCosineIK(const PMDIK& ik) {
+
+	vector<XMVECTOR> positions;
+	std::array<float, 2> edgeLens;
+
+	//IKチェーンが逆順なので、逆に並ぶようにしている
+	auto& targetNode = _boneNodeTable[_boneNameArray[ik.targetIdx]];
+	positions.emplace_back(XMLoadFloat3(&targetNode.startPos));
+
+	for (auto& chainBoneIdx : ik.nodeIdxes) {
+		auto& boneNode = _boneNodeTable[_boneNameArray[chainBoneIdx]];
+		positions.emplace_back(XMLoadFloat3(&boneNode.startPos));
+	}
+
+	reverse(positions.begin(), positions.end());
+
+	//元の長さを測っておく
+	edgeLens[0] = XMVector3Length(XMVectorSubtract(positions[1], positions[0])).m128_f32[0];
+	edgeLens[1] = XMVector3Length(XMVectorSubtract(positions[2], positions[1])).m128_f32[0];
+
+	//ターゲットとルートノードを現在の行列で座標変換する
+	//※ノードは根っこに向かって数えられるため1番がルートになっている
+	auto rootPos = positions[0];
+
+	//根っこ
+	positions[0] = XMVector3Transform(positions[0], _boneMatrices[ik.nodeIdxes[1]]);
+
+	//ターゲット
+	positions[2] = XMVector3Transform(positions[2], _boneMatrices[ik.targetIdx]);
+
+	//ターゲットとルートのベクトルを作っておく
+	auto linearVec = XMVectorSubtract(positions[2], positions[0]);
+	float A = XMVector3Length(linearVec).m128_f32[0];
+	float B = edgeLens[0];
+	float C = edgeLens[1];
+
+	linearVec = XMVector3Normalize(linearVec);
+
+
+	//ルートから真ん中への角度計算
+	float theta1 = acosf((A*A + B * B - C * C) / (2 * A*B));
+
+
+	//真ん中からターゲットへの角度計算
+	float theta2 = acosf((B*B + C * C - A * A) / (2 * B*C));
+
+	//「軸」を求める
+	//もし真ん中が「ひざ」であった場合には強制的にX軸とする。
+	//注意点…IKチェーンは根っこに向かってから数えられるため1が根っこに近い
+	auto mat1 = XMMatrixTranslationFromVector(-positions[0]);
+	mat1 *= XMMatrixRotationX(theta1);
+	mat1 *= XMMatrixTranslationFromVector(positions[0]);
+	//_boneMatrices[ik.nodeIdxes[1]] *= mat1; // _boneMatrices[ik.nodeIdxes[1]] * mat1;// 
+
+	auto& pareMat = _boneMatrices[ik.nodeIdxes[1]];
+
+	//auto mat1 = XMMatrixTranslationFromVector(-rootPos);
+	//mat1 *= XMMatrixRotationX(-theta1);
+	//mat1*=XMMatrixTranslationFromVector(rootPos);
+	//_boneMatrices[ik.nodeIdxes[1]] = mat1;// _boneMatrices[ik.nodeIdxes[1]] * mat1;// 
+
+
+
+	auto mat2 = XMMatrixTranslationFromVector(-positions[1]);
+	mat2 *= XMMatrixRotationX(theta2-XM_PI);
+	//positions[1] = XMVector3TransformCoord(positions[1], mat1);//ひとつ上のやつで再計算
+	mat2 *= XMMatrixTranslationFromVector(positions[1]);
+
+	_boneMatrices[ik.nodeIdxes[1]] *= mat1;
+
+	_boneMatrices[ik.nodeIdxes[0]] = mat2 * _boneMatrices[ik.nodeIdxes[1]];// _boneMatrices[ik.nodeIdxes[0]] * mat1;// mat2*mat1;// *_boneMatrices[ik.nodeIdxes[0]];
 }
 
 void 
@@ -255,6 +342,18 @@ PMDActor::Transform::operator new(size_t size) {
 
 void
 PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat) {
+	//IKでかつ、親の影響を受けないならここで親の行列を乗算しないようにしておく
+	if (node->boneType == (uint32_t)BoneType::IK && node->ikParentBone == -1)return;
+	if (node->boneType == (uint32_t)::BoneType::IKChild && node->ikParentBone>0) {
+		//IK情報を検索し、IKのターゲットボーンであれば親の影響を受けないようにしておく
+		auto boneIdx = node->ikParentBone;
+		auto ikIt = find_if(_ikData.begin(), _ikData.end(), [boneIdx](const PMDIK& ik) {return ik.boneIdx == boneIdx; });
+		if (ikIt != _ikData.end()) {
+			if (ikIt->targetIdx == node->boneIdx) {
+				return;
+			}
+		}
+	}
 	_boneMatrices[node->boneIdx] *= mat;
 	for (auto& cnode : node->children) {
 		RecursiveMatrixMultipy(cnode, _boneMatrices[node->boneIdx]);
@@ -349,7 +448,10 @@ PMDActor::MotionUpdate() {
 
 	auto elapsedTime = timeGetTime() - _startTime;//経過時間を測る
 	unsigned int frameNo = 30 * (elapsedTime / 1000.0f);
-
+	if (frameNo > _duration) {
+		_startTime = timeGetTime();
+		frameNo = 0;
+	}
 
 	//行列情報クリア(してないと前フレームのポーズが重ね掛けされてモデルが壊れる)
 	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
@@ -362,11 +464,13 @@ PMDActor::MotionUpdate() {
 			continue;
 		}
 		auto node = itBoneNode->second;
+
+
 		//合致するものを探す
 		auto keyframes = bonemotion.second;
 
 		auto rit=find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
-			return keyframe.frameNo < frameNo;
+			return keyframe.frameNo <= frameNo;
 		});
 		if (rit == keyframes.rend())continue;//合致するものがなければ飛ばす
 		XMMATRIX rotation=XMMatrixIdentity();
@@ -392,7 +496,29 @@ PMDActor::MotionUpdate() {
 		_boneMatrices[node.boneIdx] =mat*XMMatrixTranslationFromVector(offset);
 	}
 	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
+
+	IKSolve();
+
 	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
+}
+
+void 
+PMDActor::IKSolve() {
+	//まずはIKのターゲットボーンを動かす
+	for (auto& ik : _ikData) {
+		if (ik.nodeIdxes.size() > 2) {
+			auto& ikMat = _boneMatrices[ik.boneIdx];
+			auto& targetMat = _boneMatrices[ik.targetIdx];
+			targetMat *= ikMat;
+			for (auto& child : ik.nodeIdxes) {
+			//	_boneMatrices[child] *= ikMat;
+			}
+		}
+		else if(ik.nodeIdxes.size()==2){
+			SolveCosineIK(ik);
+			//RecursiveMatrixMultipy(&_boneNodeTable[_boneNameArray[ik.nodeIdxes[1]]], XMMatrixIdentity());
+		}
+	}
 }
 
 HRESULT
@@ -611,14 +737,16 @@ PMDActor::LoadPMDFile(const char* path) {
 
 	//ボーン情報構築
 	//インデックスと名前の対応関係構築のために後で使う
-	vector<string> boneNames(pmdBones.size());
+	_boneNameArray.resize(pmdBones.size());
 	//ボーンノードマップを作る
 	for (int idx = 0; idx < pmdBones.size(); ++idx) {
 		auto& pb = pmdBones[idx];
-		boneNames[idx] = pb.boneName;
+		_boneNameArray[idx] = pb.boneName;
 		auto& node = _boneNodeTable[pb.boneName];
 		node.boneIdx = idx;
 		node.startPos = pb.pos;
+		node.boneType = pb.type;
+		node.ikParentBone = pb.ikBoneNo;
 	}
 	//ツリー親子関係を構築する
 	for (auto& pb : pmdBones) {
@@ -626,7 +754,7 @@ PMDActor::LoadPMDFile(const char* path) {
 		if (pb.parentNo >= pmdBones.size()) {
 			continue;
 		}
-		auto parentName = boneNames[pb.parentNo];
+		auto parentName = _boneNameArray[pb.parentNo];
 		_boneNodeTable[parentName].children.emplace_back(&_boneNodeTable[pb.boneName]);
 	}
 	//ボーン番号からボーンテーブル内の情報にアクセスしやすいようイテレータテーブル作っておく
@@ -826,7 +954,7 @@ PMDActor::CreateMaterialAndTextureView() {
 
 void 
 PMDActor::Update() {
-	//_angle += 0.001f;
+	_angle += 0.001f;
 	_mappedMatrices[0] =  XMMatrixRotationY(_angle);
 	MotionUpdate();
 }
