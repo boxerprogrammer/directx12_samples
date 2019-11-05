@@ -47,12 +47,13 @@ namespace {
 	}
 
 
-	///特定の方向を向かす行列を返す関数
+	///Z軸を特定の方向を向かす行列を返す関数
 	///@param lookat 向かせたい方向ベクトル
+	///@param up 上ベクトル
 	///@param right 右ベクトル
-	XMMATRIX LookAtMatrix(XMFLOAT3& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
 		//向かせたい方向(z軸)
-		XMVECTOR vz = XMVector3Normalize(XMLoadFloat3(&lookat));
+		XMVECTOR vz = lookat;
 
 		//(向かせたい方向を向かせたときの)仮のy軸ベクトル
 		XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
@@ -72,23 +73,21 @@ namespace {
 			vx = XMVector3Normalize(XMVector3Cross(vy, vz));
 		}
 		XMMATRIX ret = XMMatrixIdentity();
-		XMFLOAT3 fvx, fvy, fvz;
-		XMStoreFloat3(&fvx, vx);
-		XMStoreFloat3(&fvy, vy);
-		XMStoreFloat3(&fvz, vz);
-
 		ret.r[0] = vx;
 		ret.r[1] = vy;
 		ret.r[2] = vz;
-		
 		return ret;
-
 	}
 
-	//特定のベクトルを特定の方向に向けるための行列
-	XMMATRIX LookAtMatrix(XMFLOAT3& origin, XMFLOAT3& lookat, XMFLOAT3& up, XMFLOAT3& right) {
-		XMMATRIX tmp = LookAtMatrix(origin, up, right);
-		return XMMatrixTranspose(tmp)*LookAtMatrix(lookat, up, right);
+	///特定のベクトルを特定の方向に向けるための行列を返す
+	///@param origin 特定のベクトル
+	///@param lookat 向かせたい方向
+	///@param up 上ベクトル
+	///@param right 右ベクトル
+	///@retval 特定のベクトルを特定の方向に向けるための行列
+	XMMATRIX LookAtMatrix(const XMVECTOR& origin, const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+		return XMMatrixTranspose(LookAtMatrix(origin, up, right))*
+									LookAtMatrix(lookat, up, right);
 	}
 	//ボーン種別
 	enum class BoneType {
@@ -106,12 +105,36 @@ namespace {
 
 void
 PMDActor::LookAt(float x, float y, float z) {
-	_localMat = LookAtMatrix(XMFLOAT3(x, y, z), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
+	_localMat = LookAtMatrix(XMLoadFloat3(&XMFLOAT3(x, y, z)), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
 }
 
 
+void
+PMDActor::SolveLookAt(const PMDIK& ik) {
+	//この関数に来た時点でノードはひとつしかなく、チェーンに入っているノード番号は
+	//IKのルートノードのものなので、このルートノードからターゲットに向かうベクトルを考えればよい
+	auto rootNode=_boneNodeAddressArray[ik.nodeIdxes[0]];
+	auto targetNode = _boneNodeAddressArray[ik.boneIdx];
+
+	auto opos1 = XMLoadFloat3(&rootNode->startPos);
+	auto tpos1 = XMLoadFloat3(&targetNode->startPos);
+
+	auto opos2 = XMVector3TransformCoord( opos1,_boneMatrices[ik.nodeIdxes[0]]);
+	auto tpos2 = XMVector3TransformCoord( tpos1, _boneMatrices[ik.boneIdx]);
+
+
+	auto originVec = XMVectorSubtract(tpos1,opos1);
+	auto targetVec = XMVectorSubtract(tpos2,opos2);
+
+	originVec = XMVector3Normalize(originVec);
+	targetVec = XMVector3Normalize(targetVec);
+	_boneMatrices[ik.nodeIdxes[0]]=LookAtMatrix(originVec, targetVec, XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
+}
+
 void 
 PMDActor::SolveCosineIK(const PMDIK& ik) {
+	//「軸」を求める
+	//もし真ん中が「ひざ」であった場合には強制的にX軸とする。
 
 	vector<XMVECTOR> positions;
 	std::array<float, 2> edgeLens;
@@ -163,20 +186,11 @@ PMDActor::SolveCosineIK(const PMDIK& ik) {
 	auto mat1 = XMMatrixTranslationFromVector(-positions[0]);
 	mat1 *= XMMatrixRotationX(theta1);
 	mat1 *= XMMatrixTranslationFromVector(positions[0]);
-	//_boneMatrices[ik.nodeIdxes[1]] *= mat1; // _boneMatrices[ik.nodeIdxes[1]] * mat1;// 
 
 	auto& pareMat = _boneMatrices[ik.nodeIdxes[1]];
 
-	//auto mat1 = XMMatrixTranslationFromVector(-rootPos);
-	//mat1 *= XMMatrixRotationX(-theta1);
-	//mat1*=XMMatrixTranslationFromVector(rootPos);
-	//_boneMatrices[ik.nodeIdxes[1]] = mat1;// _boneMatrices[ik.nodeIdxes[1]] * mat1;// 
-
-
-
 	auto mat2 = XMMatrixTranslationFromVector(-positions[1]);
 	mat2 *= XMMatrixRotationX(theta2-XM_PI);
-	//positions[1] = XMVector3TransformCoord(positions[1], mat1);//ひとつ上のやつで再計算
 	mat2 *= XMMatrixTranslationFromVector(positions[1]);
 
 	_boneMatrices[ik.nodeIdxes[1]] *= mat1;
@@ -185,20 +199,15 @@ PMDActor::SolveCosineIK(const PMDIK& ik) {
 }
 
 void 
-PMDActor::SolveCCDIK(uint16_t boneIdx) {
-	//元座標から動いてなかったら解決しない
-	//if (offset.x==0&& offset.y == 0 && offset.z == 0 ) {
-	//	return;
-	//}
-
-	auto ikIt = find_if(_ikData.begin(), _ikData.end(), [boneIdx](const PMDIK& ik) {
-		return ik.boneIdx == boneIdx;
-	});
-	if (ikIt == _ikData.end()) {
-		return;
+PMDActor::SolveCCDIK(const PMDIK& ik) {
+	auto& ikMat = _boneMatrices[ik.boneIdx];
+	auto& targetMat = _boneMatrices[ik.targetIdx];
+	targetMat *= ikMat;
+	for (auto& child : ik.nodeIdxes) {
+		_boneMatrices[child] = ikMat;
 	}
-	auto& bone= *_boneNodeAddressArray[boneIdx];
-	
+	auto& boneName= _boneNameArray[ik.targetIdx];
+	auto targetBoneNode = _boneNodeAddressArray[ik.targetIdx];
 	//XMFLOAT3 ikOriginPos = bone.startPos;//そのIKの元の座標
 	//XMFLOAT3 ikTargetPos = bone.startPos + offset;//移動後のIKの座標
 	//_ikpos = ikTargetPos;//表示用IK座標に代入
@@ -506,17 +515,19 @@ void
 PMDActor::IKSolve() {
 	//まずはIKのターゲットボーンを動かす
 	for (auto& ik : _ikData) {
-		if (ik.nodeIdxes.size() > 2) {
-			auto& ikMat = _boneMatrices[ik.boneIdx];
-			auto& targetMat = _boneMatrices[ik.targetIdx];
-			targetMat *= ikMat;
-			for (auto& child : ik.nodeIdxes) {
-			//	_boneMatrices[child] *= ikMat;
-			}
-		}
-		else if(ik.nodeIdxes.size()==2){
+		auto childrenNodesCount = ik.nodeIdxes.size();
+		switch(childrenNodesCount) {
+		case 0://間のボーン数が0(ありえない)
+			assert(0);
+			continue;
+		case 1://間のボーン数が1のときはLookAt
+			SolveLookAt(ik);
+			break;
+		case 2://間のボーン数が2のときは余弦定理IK
 			SolveCosineIK(ik);
-			//RecursiveMatrixMultipy(&_boneNodeTable[_boneNameArray[ik.nodeIdxes[1]]], XMMatrixIdentity());
+			break;
+		case 3://3以上の時はCCD-IK
+			SolveCCDIK(ik);
 		}
 	}
 }
@@ -735,18 +746,21 @@ PMDActor::LoadPMDFile(const char* path) {
 
 	//読み込み後の処理
 
+	_boneNameArray.resize(pmdBones.size());
+	_boneNodeAddressArray.resize(pmdBones.size());
 	//ボーン情報構築
 	//インデックスと名前の対応関係構築のために後で使う
-	_boneNameArray.resize(pmdBones.size());
 	//ボーンノードマップを作る
 	for (int idx = 0; idx < pmdBones.size(); ++idx) {
 		auto& pb = pmdBones[idx];
-		_boneNameArray[idx] = pb.boneName;
 		auto& node = _boneNodeTable[pb.boneName];
 		node.boneIdx = idx;
 		node.startPos = pb.pos;
 		node.boneType = pb.type;
 		node.ikParentBone = pb.ikBoneNo;
+		//インデックス検索がしやすいように
+		_boneNameArray[idx] = pb.boneName;
+		_boneNodeAddressArray[idx] = &node;
 	}
 	//ツリー親子関係を構築する
 	for (auto& pb : pmdBones) {
@@ -757,12 +771,6 @@ PMDActor::LoadPMDFile(const char* path) {
 		auto parentName = _boneNameArray[pb.parentNo];
 		_boneNodeTable[parentName].children.emplace_back(&_boneNodeTable[pb.boneName]);
 	}
-	//ボーン番号からボーンテーブル内の情報にアクセスしやすいようイテレータテーブル作っておく
-	_boneNodeAddressArray.resize(pmdBones.size());
-	for (auto& boneKeyValue : _boneNodeTable) {
-		_boneNodeAddressArray[boneKeyValue.second.boneIdx] = &boneKeyValue.second;
-	}
-
 
 	//ボーン構築
 	_boneMatrices.resize(pmdBones.size());

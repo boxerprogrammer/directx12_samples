@@ -81,8 +81,7 @@ private:
 	};
 	std::unordered_map<std::string, BoneNode> _boneNodeTable;
 	std::vector<std::string> _boneNameArray;//インデックスから名前を検索しやすいようにしておく
-
-	std::vector<BoneNode*> _boneNodeAddressArray;
+	std::vector<BoneNode*> _boneNodeAddressArray;//インデックスからノードを検索しやすいようにしておく
 
 
 	struct PMDIK {
@@ -131,8 +130,17 @@ private:
 	
 	void MotionUpdate();
 
-	void SolveCCDIK(uint16_t boneIdx);
+	///CCD-IKによりボーン方向を解決
+	///@param ik 対象IKオブジェクト
+	void SolveCCDIK(const PMDIK& ik);
+
+	///余弦定理IKによりボーン方向を解決
+	///@param ik 対象IKオブジェクト
 	void SolveCosineIK(const PMDIK& ik);
+	
+	///LookAt行列によりボーン方向を解決
+	///@param ik 対象IKオブジェクト
+	void SolveLookAt(const PMDIK& ik);
 
 	void IKSolve();
 
