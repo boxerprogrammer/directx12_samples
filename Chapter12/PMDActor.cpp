@@ -204,10 +204,33 @@ PMDActor::SolveCCDIK(const PMDIK& ik) {
 	auto& targetMat = _boneMatrices[ik.targetIdx];
 	targetMat *= ikMat;
 	for (auto& child : ik.nodeIdxes) {
-		_boneMatrices[child] = ikMat;
+		//_boneMatrices[child] = ikMat;
 	}
-	auto& boneName= _boneNameArray[ik.targetIdx];
-	auto targetBoneNode = _boneNodeAddressArray[ik.targetIdx];
+
+	//ターゲット
+	auto targetBoneNode = _boneNodeAddressArray[ik.boneIdx];
+	auto targetOriginPos = XMLoadFloat3(&targetBoneNode->startPos);
+	auto targetNextPos = XMVector3Transform(targetOriginPos,_boneMatrices[ik.boneIdx]);
+
+	//まずはIKの間にあるボーンの座標を入れておく(逆順注意)
+	std::vector<XMVECTOR> bonePositions;
+	bonePositions.reserve(ik.nodeIdxes.size() + 1);
+
+	auto endPos = XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos), _boneMatrices[ik.targetIdx]);
+	//代入していくときにIK以外の座標変換を適用
+	bonePositions.emplace_back(endPos);
+	for (auto& cidx:ik.nodeIdxes) {
+		bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),_boneMatrices[cidx] ));
+	}
+	//reverse(bonePositions.begin(), bonePositions.end());
+
+	for (int c = 0; c < ik.iterations; ++c) {//試行回数だけ繰り返す
+		//末端から攻めていくが末端との角度を計算するため末端は省く
+
+
+	}
+
+	//エンドノード(リーフ…ターゲットに近づけようとする)
 	//XMFLOAT3 ikOriginPos = bone.startPos;//そのIKの元の座標
 	//XMFLOAT3 ikTargetPos = bone.startPos + offset;//移動後のIKの座標
 	//_ikpos = ikTargetPos;//表示用IK座標に代入
