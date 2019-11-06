@@ -197,150 +197,85 @@ PMDActor::SolveCosineIK(const PMDIK& ik) {
 
 	_boneMatrices[ik.nodeIdxes[0]] = mat2 * _boneMatrices[ik.nodeIdxes[1]];// _boneMatrices[ik.nodeIdxes[0]] * mat1;// mat2*mat1;// *_boneMatrices[ik.nodeIdxes[0]];
 }
-
+//誤差の範囲内かどうかに使用する定数
+constexpr float epsilon = 0.0005f;
 void 
 PMDActor::SolveCCDIK(const PMDIK& ik) {
-	auto& ikMat = _boneMatrices[ik.boneIdx];
-	auto& targetMat = _boneMatrices[ik.targetIdx];
-	targetMat *= ikMat;
-	for (auto& child : ik.nodeIdxes) {
-		//_boneMatrices[child] = ikMat;
-	}
-
 	//ターゲット
 	auto targetBoneNode = _boneNodeAddressArray[ik.boneIdx];
 	auto targetOriginPos = XMLoadFloat3(&targetBoneNode->startPos);
-	auto targetNextPos = XMVector3Transform(targetOriginPos,_boneMatrices[ik.boneIdx]);
+
+	auto parentMat= _boneMatrices[_boneNodeAddressArray[ik.boneIdx]->ikParentBone];
+	XMVECTOR det;
+	auto invParentMat = XMMatrixInverse(&det, parentMat);
+
+	auto targetNextPos = XMVector3Transform(targetOriginPos, _boneMatrices[ik.boneIdx]* invParentMat);
+
 
 	//まずはIKの間にあるボーンの座標を入れておく(逆順注意)
 	std::vector<XMVECTOR> bonePositions;
-	bonePositions.reserve(ik.nodeIdxes.size() + 1);
-
-	auto endPos = XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos), _boneMatrices[ik.targetIdx]);
+	
+	auto endPos = XMVector3Transform(
+		XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos), 
+		//_boneMatrices[ik.targetIdx]);
+		XMMatrixIdentity());
 	//代入していくときにIK以外の座標変換を適用
-	bonePositions.emplace_back(endPos);
 	for (auto& cidx:ik.nodeIdxes) {
-		bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),_boneMatrices[cidx] ));
+		bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),
+			//_boneMatrices[cidx] ));
+			XMMatrixIdentity()));
 	}
-	//reverse(bonePositions.begin(), bonePositions.end());
-
+	
+	vector<XMMATRIX> mats(bonePositions.size());
+	fill(mats.begin(), mats.end(), XMMatrixIdentity());
+	//ちょっとよくわからないが、PMDエディタの6.8°が0.03になっており、これは180で割っただけの値である。
+	//つまりこれをラジアンとして使用するにはXM_PIを乗算しなければならない…と思われる。
+	auto ikLimit = ik.limit*XM_PI;
 	for (int c = 0; c < ik.iterations; ++c) {//試行回数だけ繰り返す
-		//末端から攻めていくが末端との角度を計算するため末端は省く
+		if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
+			break;
+		}
+		for (int bidx = 0; bidx < bonePositions.size();++bidx) {
+			const auto& pos = bonePositions[bidx];
+			auto vecToEnd = XMVectorSubtract(endPos, pos);
+			auto vecToTarget = XMVectorSubtract(targetNextPos, pos);
+			vecToEnd = XMVector3Normalize(vecToEnd);
+			vecToTarget = XMVector3Normalize(vecToTarget);
+			
+			
+			if (XMVector3Length(XMVectorSubtract(vecToEnd, vecToTarget)).m128_f32[0] <= epsilon) {
+				continue;
+			}
 
+			auto cross = XMVector3Cross(vecToEnd, vecToTarget);
 
+			float angle =  XMVector3AngleBetweenVectors(vecToEnd, vecToTarget).m128_f32[0];
+			XMMATRIX rot;
+			if (ikLimit < abs(angle)) {
+				angle = (angle / abs(angle))*ikLimit;
+			}
+			rot = XMMatrixRotationAxis(cross, angle);
+			auto mat=XMMatrixTranslationFromVector(-pos)*
+									rot*
+									XMMatrixTranslationFromVector(pos);
+			mats[bidx]*=mat;
+			for (auto idx = bidx-1; idx >= 0; --idx) {
+				bonePositions[idx]= XMVector3Transform(bonePositions[idx], mat);
+			}
+			endPos= XMVector3Transform(endPos, mat);
+			if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
+				break;
+			}
+		}
 	}
+	int idx = 0;
+	for (auto& cidx : ik.nodeIdxes) {
+		_boneMatrices[cidx] = mats[idx];
+		++idx;
+	}
+	auto node = _boneNodeAddressArray[ik.nodeIdxes.back()];
+	RecursiveMatrixMultipy(node, parentMat,true);
 
-	//エンドノード(リーフ…ターゲットに近づけようとする)
-	//XMFLOAT3 ikOriginPos = bone.startPos;//そのIKの元の座標
-	//XMFLOAT3 ikTargetPos = bone.startPos + offset;//移動後のIKの座標
-	//_ikpos = ikTargetPos;//表示用IK座標に代入
-
-	////まずはIKの間にあるボーンの座標の一時変数配列を作って、値をコピーする
-	////理由はIK再帰する毎に、ボーン座標が変更されるからである(元の座標は保持が必要なので一次変数に格納)
-	//std::vector<XMFLOAT3> tmpBonePositions(iklist.ikchainLen);
-	//for (int i = 0; i < iklist.ikchainLen; ++i) {
-	//	tmpBonePositions[i] = mesh.Bones()[iklist.ikboneIndices[i]].headpos;
-	//}
-
-	////ボーンの根っこ部分(IKから最も遠いボーン)からIKの元の座標へのベクトルを作っておく(軸作成用)
-	//XMFLOAT3 ikOriginRootVec = ikOriginPos - tmpBonePositions[iklist.ikchainLen - 1];
-
-	////ボーンの根っこ部分(IKから最も遠いボーン)から移動後IK座標へのベクトルを作っておく(軸作成用)
-	//XMFLOAT3 ikTargetRootVec = ikTargetPos - tmpBonePositions[iklist.ikchainLen - 1];
-
-	//float ikmaxLen = Length(ikOriginRootVec);
-	//if (Length(ikTargetRootVec) > ikmaxLen) {
-	//	XMVECTOR vec = XMLoadFloat3(&ikTargetRootVec);
-	//	vec = XMVector3ClampLength(vec, 0.1, ikmaxLen);
-	//	XMStoreFloat3(&ikTargetRootVec, vec);
-	//	ikTargetPos = ikTargetRootVec + tmpBonePositions[iklist.ikchainLen - 1];
-	//	_ikpos = ikTargetPos;
-	//}
-	//if (ikOriginRootVec == ikTargetRootVec) {
-	//	return;
-	//}
-
-	////IK移動前から移動後への回転ベクトルを計算しておく
-	//XMMATRIX matIkRot = LookAtMatrix(Normalize(ikOriginRootVec), Normalize(ikTargetRootVec), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
-
-	////ここからがCCD-IKだ
-	////ホントはここでサイクリック(繰り返す)んですが、まず一回目のことだけ
-	////考えます。
-	//for (int c = 0; c < iklist.iterations; ++c) {
-	//	//中間ボーン座標補正
-	//	for (int i = 0; i < iklist.ikchainLen; ++i) {
-	//		int ikboneIdx = iklist.ikboneIndices[i];
-	//		PMDMesh::Bone& bone = mesh.Bones()[ikboneIdx];
-	//		//補正するたびにコントロールポイントの座標は変わるがそこに対するベクトルを再計算していく。
-	//		XMFLOAT3 originVec = ikOriginPos - tmpBonePositions[i];//もとの先っちょIKとさかのぼりノードでベクトル作成
-	//		XMFLOAT3 targetVec = ikTargetPos - tmpBonePositions[i];//目標地点とさかのぼりノードでベクトルを作成
-	//		if (originVec == targetVec)return;
-	//		//それぞれのベクトル長が小さすぎる場合は処理を打ち切る
-	//		if (Length(originVec) < 0.0001f || Length(targetVec) < 0.0001f) {
-	//			return;
-	//		}
-
-	//		//正規化します
-	//		originVec = Normalize(originVec);
-	//		targetVec = Normalize(targetVec);
-
-	//		//外積から軸を作成します
-	//		XMFLOAT3 axis = Normalize(Cross(originVec, targetVec));
-
-	//		//もしひざ系なら、x軸を回転軸とする
-	//		if (bone.name.find("ひざ") != std::string::npos) {
-	//			axis.x = -1;
-	//			axis.y = 0;
-	//			axis.z = 0;
-	//			//その軸をmatIkRotで回転する。
-	//			XMVECTOR tmpvec = XMLoadFloat3(&axis);
-	//			tmpvec = XMVector3Transform(tmpvec, matIkRot);
-	//			XMStoreFloat3(&axis, tmpvec);
-	//		}
-	//		else {
-	//			if (Length(axis) == 0.0f) {
-	//				return;//外積結果が0になってるなら使えません
-	//			}
-	//		}
-	//		//ふたつのベクトルの間の角度を計算(制限角度演算のため)
-	//		float angle = XMVector3AngleBetweenNormals(XMLoadFloat3(&originVec), XMLoadFloat3(&targetVec)).m128_f32[0];
-	//		angle *= 0.5;//ここ半分にしてるの何故…？
-
-	//		////角度が小さすぎる場合は処理を打ち切る
-	//		if (abs(angle) == 0.000f) {
-	//			return;
-	//		}
-
-	//		////制限角度を計算
-	//		float strict = iklist.limitAngle * 4;//制限角度は持ってきた角度の４倍
-	//		//それ以上に曲げられないようにしとく
-	//		angle = min(angle, strict);
-	//		angle = max(angle, -strict);
-
-	//		//ボーン変換行列を計算
-	//		XMMATRIX rotMat = XMMatrixRotationAxis(XMLoadFloat3(&axis), angle);
-
-	//		//一時ボーン座標は次のベクトルを作るために必要なので再計算する。
-	//		XMFLOAT3& tmpbonePosition = tmpBonePositions[i];
-	//		XMMATRIX mat = XMMatrixTranslation(-tmpbonePosition.x, -tmpbonePosition.y, -tmpbonePosition.z)*
-	//			rotMat*
-	//			XMMatrixTranslation(tmpbonePosition.x, tmpbonePosition.y, tmpbonePosition.z);
-
-	//		//ボーン頂点座標を更新
-	//		ikOriginPos = ikOriginPos * mat;
-	//		for (int j = 0; j < i; ++j) {
-	//			tmpBonePositions[j] = tmpBonePositions[j] * mat;
-	//		}
-
-	//		//実際にボーンを回転させるための行列を作る(原点に移動→回転→元の座標)
-	//		mat = XMMatrixTranslation(-bone.headpos.x, -bone.headpos.y, -bone.headpos.z)*
-	//			rotMat*
-	//			XMMatrixTranslation(bone.headpos.x, bone.headpos.y, bone.headpos.z);
-
-	//		//変換行列を計算(オフセットを考慮)
-	//		mesh.BoneMatrixes()[ikboneIdx] = mesh.BoneMatrixes()[ikboneIdx] * mat;
-	//	}
-	//}
 }
 
 float 
@@ -351,8 +286,7 @@ PMDActor::GetYFromXOnBezier(float x, const XMFLOAT2& a, const XMFLOAT2& b, uint8
 	const float k1 = 3 * b.x - 6 * a.x;//t^2の係数
 	const float k2 = 3 * a.x;//tの係数
 
-	//誤差の範囲内かどうかに使用する定数
-	constexpr float epsilon = 0.0005f;
+	
 
 	for (int i = 0; i < n; ++i) {
 		//f(t)求めまーす
@@ -373,16 +307,18 @@ PMDActor::Transform::operator new(size_t size) {
 }
 
 void
-PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat) {
-	//IKでかつ、親の影響を受けないならここで親の行列を乗算しないようにしておく
-	if (node->boneType == (uint32_t)BoneType::IK && node->ikParentBone == -1)return;
-	if (node->boneType == (uint32_t)::BoneType::IKChild && node->ikParentBone>0) {
-		//IK情報を検索し、IKのターゲットボーンであれば親の影響を受けないようにしておく
-		auto boneIdx = node->ikParentBone;
-		auto ikIt = find_if(_ikData.begin(), _ikData.end(), [boneIdx](const PMDIK& ik) {return ik.boneIdx == boneIdx; });
-		if (ikIt != _ikData.end()) {
-			if (ikIt->targetIdx == node->boneIdx) {
-				return;
+PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat,bool flg) {
+	if (!flg) {
+		//IKでかつ、親の影響を受けないならここで親の行列を乗算しないようにしておく
+		if (node->boneType == (uint32_t)BoneType::IK && node->ikParentBone == -1)return;
+		if (node->boneType == (uint32_t)::BoneType::IKChild && node->ikParentBone > 0) {
+			//IK情報をIK親番号で検索し、今の対象ノードがIKのターゲットボーンであれば親の影響を受けないようにしておく
+			auto boneIdx = node->ikParentBone;
+			auto ikIt = find_if(_ikData.begin(), _ikData.end(), [boneIdx](const PMDIK& ik) {return ik.boneIdx == boneIdx; });
+			if (ikIt != _ikData.end()) {
+				if (ikIt->targetIdx == node->boneIdx) {
+					return;
+				}
 			}
 		}
 	}
@@ -549,7 +485,7 @@ PMDActor::IKSolve() {
 		case 2://間のボーン数が2のときは余弦定理IK
 			SolveCosineIK(ik);
 			break;
-		case 3://3以上の時はCCD-IK
+		default://3以上の時はCCD-IK
 			SolveCCDIK(ik);
 		}
 	}
@@ -780,6 +716,7 @@ PMDActor::LoadPMDFile(const char* path) {
 		node.boneIdx = idx;
 		node.startPos = pb.pos;
 		node.boneType = pb.type;
+		node.parentBone = pb.parentNo;
 		node.ikParentBone = pb.ikBoneNo;
 		//インデックス検索がしやすいように
 		_boneNameArray[idx] = pb.boneName;

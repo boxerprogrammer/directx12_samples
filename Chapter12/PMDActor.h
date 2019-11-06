@@ -75,6 +75,7 @@ private:
 	struct BoneNode {
 		uint32_t boneIdx;//ボーンインデックス
 		uint32_t boneType;//ボーン種別
+		uint32_t parentBone;
 		uint32_t ikParentBone;//IK親ボーン
 		DirectX::XMFLOAT3 startPos;//ボーン基準点(回転中心)
 		std::vector<BoneNode*> children;//子ノード
@@ -105,7 +106,7 @@ private:
 
 	//PMDファイルのロード
 	HRESULT LoadPMDFile(const char* path);
-	void RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat);
+	void RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat,bool flg=false);
 	float _angle;//テスト用Y軸回転
 
 
