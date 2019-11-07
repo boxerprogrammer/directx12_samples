@@ -131,7 +131,11 @@ PMDActor::SolveLookAt(const PMDIK& ik) {
 	XMMATRIX mat = XMMatrixTranslationFromVector(-opos2)*
 					LookAtMatrix(originVec, targetVec, XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0))*
 					XMMatrixTranslationFromVector(opos2);
-	_boneMatrices[ik.nodeIdxes[0]] =mat;
+
+	//auto parent = _boneNodeAddressArray[ik.boneIdx]->parentBone;
+
+	_boneMatrices[ik.nodeIdxes[0]] = mat;// _boneMatrices[ik.boneIdx] * _boneMatrices[parent];
+	//_boneMatrices[ik.targetIdx] = _boneMatrices[parent];
 }
 
 void
@@ -152,20 +156,17 @@ PMDActor::SolveCosineIK(const PMDIK& ik) {
 		auto boneNode = _boneNodeAddressArray[chainBoneIdx];
 		positions.emplace_back(XMLoadFloat3(&boneNode->startPos));
 	}
-
-	//ちょっと分かりづらいと思ったので逆にしておく、そうでもない人はそのまま
-	//計算してもらって構わない
+	//ちょっと分かりづらいと思ったので逆にしておきます。そうでもない人はそのまま
+	//計算してもらって構わないです。
 	reverse(positions.begin(), positions.end());
 
 	//元の長さを測っておく
 	edgeLens[0] = XMVector3Length(XMVectorSubtract(positions[1], positions[0])).m128_f32[0];
 	edgeLens[1] = XMVector3Length(XMVectorSubtract(positions[2], positions[1])).m128_f32[0];
 
-	//ルートボーン
+	//ルートボーン座標変換(逆順になっているため使用するインデックスに注意)
 	positions[0] = XMVector3Transform(positions[0], _boneMatrices[ik.nodeIdxes[1]]);
-
 	//真ん中はどうせ自動計算されるので計算しない
-
 	//先端ボーン
 	positions[2] = XMVector3Transform(positions[2], _boneMatrices[ik.boneIdx]);//ホンマはik.targetIdxだが…！？
 
@@ -208,7 +209,10 @@ PMDActor::SolveCosineIK(const PMDIK& ik) {
 
 	_boneMatrices[ik.nodeIdxes[1]] *= mat1;
 	_boneMatrices[ik.nodeIdxes[0]] = mat2 * _boneMatrices[ik.nodeIdxes[1]];
-	_boneMatrices[ik.targetIdx] = _boneMatrices[ik.nodeIdxes[0]];
+	_boneMatrices[ik.targetIdx] = _boneMatrices[ik.nodeIdxes[0]];//直前の影響を受ける
+	//_boneMatrices[ik.nodeIdxes[1]] = _boneMatrices[ik.boneIdx];
+	//_boneMatrices[ik.nodeIdxes[0]] = _boneMatrices[ik.boneIdx];
+	//_boneMatrices[ik.targetIdx] *= _boneMatrices[ik.boneIdx];
 }
 //誤差の範囲内かどうかに使用する定数
 constexpr float epsilon = 0.0005f;
@@ -221,22 +225,22 @@ PMDActor::SolveCCDIK(const PMDIK& ik) {
 	auto parentMat = _boneMatrices[_boneNodeAddressArray[ik.boneIdx]->ikParentBone];
 	XMVECTOR det;
 	auto invParentMat = XMMatrixInverse(&det, parentMat);
-
 	auto targetNextPos = XMVector3Transform(targetOriginPos, _boneMatrices[ik.boneIdx] * invParentMat);
 
 
 	//まずはIKの間にあるボーンの座標を入れておく(逆順注意)
 	std::vector<XMVECTOR> bonePositions;
-
-	auto endPos = XMVector3Transform(
-		XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos),
-		//_boneMatrices[ik.targetIdx]);
-		XMMatrixIdentity());
-	//代入していくときにIK以外の座標変換を適用
+	//auto endPos = XMVector3Transform(
+	//	XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos),
+	//	//_boneMatrices[ik.targetIdx]);
+	//	XMMatrixIdentity());
+	//末端ノード
+	auto endPos = XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos);
+	//中間ノード(ルートを含む)
 	for (auto& cidx : ik.nodeIdxes) {
-		bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),
+		//bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),
 			//_boneMatrices[cidx] ));
-			XMMatrixIdentity()));
+		bonePositions.push_back(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos));
 	}
 
 	vector<XMMATRIX> mats(bonePositions.size());
