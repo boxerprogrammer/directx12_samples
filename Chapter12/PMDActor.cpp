@@ -249,23 +249,26 @@ PMDActor::SolveCCDIK(const PMDIK& ik) {
 	//つまりこれをラジアンとして使用するにはXM_PIを乗算しなければならない…と思われる。
 	auto ikLimit = ik.limit*XM_PI;
 	for (int c = 0; c < ik.iterations; ++c) {//試行回数だけ繰り返す
+		//ターゲットと末端がほぼ一致したら抜ける
 		if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
 			break;
 		}
+		//それぞれのボーンを遡りながら角度制限に引っ掛からないように曲げていく
 		for (int bidx = 0; bidx < bonePositions.size(); ++bidx) {
 			const auto& pos = bonePositions[bidx];
+
+			//まず現在のノードから末端までと、現在のノードからターゲットまでのベクトルを作る
 			auto vecToEnd = XMVectorSubtract(endPos, pos);
 			auto vecToTarget = XMVectorSubtract(targetNextPos, pos);
 			vecToEnd = XMVector3Normalize(vecToEnd);
 			vecToTarget = XMVector3Normalize(vecToTarget);
 
-
+			//ほぼ同じベクトルになってしまった場合は外積できないため次のボーンに引き渡す
 			if (XMVector3Length(XMVectorSubtract(vecToEnd, vecToTarget)).m128_f32[0] <= epsilon) {
 				continue;
 			}
-
+			//外積計算および角度計算
 			auto cross = XMVector3Cross(vecToEnd, vecToTarget);
-
 			float angle = XMVector3AngleBetweenVectors(vecToEnd, vecToTarget).m128_f32[0];
 			XMMATRIX rot;
 			if (ikLimit < abs(angle)) {
