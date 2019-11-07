@@ -126,6 +126,8 @@ private:
 	std::unordered_map<std::string, std::vector<KeyFrame>> _motiondata;
 
 	float GetYFromXOnBezier(float x,const DirectX::XMFLOAT2& a,const DirectX::XMFLOAT2& b, uint8_t n = 12);
+	
+	std::vector<uint32_t> _kneeIdxes;
 
 	DWORD _startTime;//アニメーション開始時点のミリ秒時刻
 	
