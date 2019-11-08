@@ -328,20 +328,6 @@ PMDActor::Transform::operator new(size_t size) {
 
 void
 PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat, bool flg) {
-	///*if (!flg)*/ {
-	//	//IKでかつ、親の影響を受けないならここで親の行列を乗算しないようにしておく
-	//	if (node->boneType == (uint32_t)BoneType::IK && node->ikParentBone == -1)return;
-	//	if (node->boneType == (uint32_t)::BoneType::IKChild && node->ikParentBone > 0) {
-	//		//IK情報をIK親番号で検索し、今の対象ノードがIKのターゲットボーンであれば親の影響を受けないようにしておく
-	//		auto boneIdx = node->ikParentBone;
-	//		auto ikIt = find_if(_ikData.begin(), _ikData.end(), [boneIdx](const PMDIK& ik) {return ik.boneIdx == boneIdx; });
-	//		if (ikIt != _ikData.end()) {
-	//			if (ikIt->targetIdx == node->boneIdx) {
-	//				return;
-	//			}
-	//		}
-	//	}
-	//}
 	_boneMatrices[node->boneIdx] *= mat;
 	for (auto& cnode : node->children) {
 		RecursiveMatrixMultipy(cnode, _boneMatrices[node->boneIdx]);
@@ -359,12 +345,6 @@ PMDActor::PMDActor(const char* filepath, PMDRenderer& renderer) :
 	CreateTransformView();
 	CreateMaterialData();
 	CreateMaterialAndTextureView();
-
-
-
-	//RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
-	//XMMatrixRotationQuaternion()
-	//copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
 
