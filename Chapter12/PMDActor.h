@@ -145,7 +145,13 @@ private:
 	///@param ik 対象IKオブジェクト
 	void SolveLookAt(const PMDIK& ik);
 
-	void IKSolve();
+	void IKSolve(int frameNo);
+
+	struct VMDIKEnable {
+		uint32_t frameNo;
+		std::unordered_map<std::string, bool> ikEnableTable;
+	};
+	std::vector<VMDIKEnable> _ikEnableData;
 
 public:
 	PMDActor(const char* filepath,PMDRenderer& renderer);

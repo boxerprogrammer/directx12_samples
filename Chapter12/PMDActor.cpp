@@ -248,7 +248,8 @@ PMDActor::SolveCCDIK(const PMDIK& ik) {
 	//ちょっとよくわからないが、PMDエディタの6.8°が0.03になっており、これは180で割っただけの値である。
 	//つまりこれをラジアンとして使用するにはXM_PIを乗算しなければならない…と思われる。
 	auto ikLimit = ik.limit*XM_PI;
-	for (int c = 0; c < ik.iterations; ++c) {//試行回数だけ繰り返す
+	//ikに設定されている試行回数だけ繰り返す
+	for (int c = 0; c < ik.iterations; ++c) {
 		//ターゲットと末端がほぼ一致したら抜ける
 		if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
 			break;
@@ -268,21 +269,21 @@ PMDActor::SolveCCDIK(const PMDIK& ik) {
 				continue;
 			}
 			//外積計算および角度計算
-			auto cross = XMVector3Cross(vecToEnd, vecToTarget);
+			auto cross = XMVector3Normalize(XMVector3Cross(vecToEnd, vecToTarget));
 			float angle = XMVector3AngleBetweenVectors(vecToEnd, vecToTarget).m128_f32[0];
-			XMMATRIX rot;
-			if (ikLimit < abs(angle)) {
-				angle = (angle / abs(angle))*ikLimit;
-			}
-			rot = XMMatrixRotationAxis(cross, angle);
+			angle = min(angle,ikLimit);//回転限界補正
+			XMMATRIX rot = XMMatrixRotationAxis(cross, angle);//回転行列
+			//posを中心に回転
 			auto mat = XMMatrixTranslationFromVector(-pos)*
 				rot*
 				XMMatrixTranslationFromVector(pos);
-			mats[bidx] *= mat;
-			for (auto idx = bidx - 1; idx >= 0; --idx) {
+			mats[bidx] *= mat;//回転行列を保持しておく(乗算で回転重ね掛けを作っておく)
+			//対象となる点をすべて回転させる(現在の点から見て末端側を回転)
+			for (auto idx = bidx - 1; idx >= 0; --idx) {//自分を回転させる必要はない
 				bonePositions[idx] = XMVector3Transform(bonePositions[idx], mat);
 			}
 			endPos = XMVector3Transform(endPos, mat);
+			//もし正解に近くなってたらループを抜ける
 			if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
 				break;
 			}
@@ -375,6 +376,88 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 			sizeof(keyframe.bezier), 1, fp);//補間ベジェデータ
 	}
 
+#pragma pack(1)
+	//表情データ(頂点モーフデータ)
+	struct VMDMorph {
+		char name[15];//名前(パディングしてしまう)
+		uint32_t frameNo;//フレーム番号
+		float weight;//ウェイト(0.0f～1.0f)
+	};//全部で23バイトなのでpragmapackで読む
+#pragma pack()
+	uint32_t morphCount = 0;
+	fread(&morphCount, sizeof(morphCount), 1, fp);
+	vector<VMDMorph> morphs(morphCount);
+	fread(morphs.data(), sizeof(VMDMorph), morphCount, fp);
+
+#pragma pack(1)
+	//カメラ
+	struct VMDCamera { 
+		uint32_t frameNo; // フレーム番号
+		float distance; // 距離
+		XMFLOAT3 pos; // 座標
+		XMFLOAT3 eulerAngle; // オイラー角
+		uint8_t Interpolation[24]; // 補完
+		uint32_t fov; // 視界角
+		uint8_t persFlg; // パースフラグON/OFF
+	};//61バイト(これもpragma pack(1)の必要あり)
+#pragma pack()
+	uint32_t vmdCameraCount = 0;
+	fread(&vmdCameraCount, sizeof(vmdCameraCount), 1, fp);
+	vector<VMDCamera> cameraData(vmdCameraCount);
+	fread(cameraData.data(), sizeof(VMDCamera), vmdCameraCount, fp);
+
+	// ライト照明データ
+	struct VMDLight {
+		uint32_t frameNo; // フレーム番号
+		XMFLOAT3 rgb; //ライト色
+		XMFLOAT3 vec; //光線ベクトル(平行光線)
+	};
+
+	uint32_t vmdLightCount = 0;
+	fread(&vmdLightCount, sizeof(vmdLightCount), 1, fp);
+	vector<VMDLight> lights(vmdLightCount);
+	fread(lights.data(), sizeof(VMDLight), vmdLightCount, fp);
+
+#pragma pack(1)
+	// セルフ影データ
+	struct VMDSelfShadow { 
+		uint32_t frameNo; // フレーム番号
+		uint8_t mode; //影モード(0:影なし、1:モード１、2:モード２)
+		float distance; //距離
+	};
+#pragma pack()
+	uint32_t selfShadowCount = 0;
+	fread(&selfShadowCount, sizeof(selfShadowCount), 1, fp);
+	vector<VMDSelfShadow> selfShadowData(selfShadowCount);
+	fread(selfShadowData.data(), sizeof(VMDSelfShadow), selfShadowCount,fp);
+
+	//IKオンオフ切り替わり数
+	uint32_t ikSwitchCount=0;
+	fread(&ikSwitchCount, sizeof(ikSwitchCount), 1, fp);
+	//IK切り替えのデータ構造は少しだけ特殊で、いくつ切り替えようが
+	//そのキーフレームは消費されます。その中で切り替える可能性のある
+	//IKの名前とそのフラグがすべて登録されている状態です。
+	
+	//ここからは気を遣って読み込みます。キーフレームごとのデータであり
+	//IKボーン(名前で検索)ごとにオン、オフフラグを持っているというデータであるとして
+	//構造体を作っていきましょう。
+	_ikEnableData.resize(ikSwitchCount);
+	for (auto& ikEnable : _ikEnableData) {
+		fread(&ikEnable.frameNo, sizeof(ikEnable.frameNo), 1, fp);
+		uint8_t visibleFlg = 0;
+		fread(&visibleFlg, sizeof(visibleFlg), 1, fp);
+		uint32_t ikBoneCount = 0;
+		fread(&ikBoneCount, sizeof(ikBoneCount), 1, fp);
+		for (int i = 0; i < ikBoneCount; ++i) {
+			char ikBoneName[20];
+			fread(ikBoneName, _countof(ikBoneName), 1, fp);
+			uint8_t flg = 0;
+			fread(&flg, sizeof(flg), 1, fp);
+			ikEnable.ikEnableTable[ikBoneName] = flg;
+		}
+	}
+	fclose(fp);
+
 	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
 	for (auto& f : keyframes) {
 		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion), f.location,
@@ -465,15 +548,26 @@ PMDActor::MotionUpdate() {
 	}
 	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
 
-	IKSolve();
+	IKSolve(frameNo);
 
 	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
 }
 
 void
-PMDActor::IKSolve() {
+PMDActor::IKSolve(int frameNo) {
+	//いつもの逆から検索
+	auto it=find_if(_ikEnableData.rbegin(),_ikEnableData.rend(),
+		[frameNo](const VMDIKEnable& ikenable) {
+			return ikenable.frameNo <= frameNo;
+		});
 	//まずはIKのターゲットボーンを動かす
 	for (auto& ik : _ikData) {
+		auto ikEnableIt= it->ikEnableTable.find(_boneNameArray[ik.boneIdx]);
+		if (ikEnableIt != it->ikEnableTable.end()) {
+			if (!ikEnableIt->second) {
+				continue;
+			}
+		}
 		auto childrenNodesCount = ik.nodeIdxes.size();
 		switch (childrenNodesCount) {
 		case 0://間のボーン数が0(ありえない)
