@@ -147,6 +147,7 @@ private:
 
 	void IKSolve(int frameNo);
 
+	//IKオンオフデータ
 	struct VMDIKEnable {
 		uint32_t frameNo;
 		std::unordered_map<std::string, bool> ikEnableTable;

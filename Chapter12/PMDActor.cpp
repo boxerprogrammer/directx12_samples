@@ -443,11 +443,15 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 	//構造体を作っていきましょう。
 	_ikEnableData.resize(ikSwitchCount);
 	for (auto& ikEnable : _ikEnableData) {
+		//キーフレーム情報なのでまずはフレーム番号読み込み
 		fread(&ikEnable.frameNo, sizeof(ikEnable.frameNo), 1, fp);
+		//次に可視フラグがありますがこれは使用しないので1バイトシークでも構いません
 		uint8_t visibleFlg = 0;
 		fread(&visibleFlg, sizeof(visibleFlg), 1, fp);
+		//対象ボーン数読み込み
 		uint32_t ikBoneCount = 0;
 		fread(&ikBoneCount, sizeof(ikBoneCount), 1, fp);
+		//ループしつつ名前とON/OFF情報を取得
 		for (int i = 0; i < ikBoneCount; ++i) {
 			char ikBoneName[20];
 			fread(ikBoneName, _countof(ikBoneName), 1, fp);
@@ -562,10 +566,12 @@ PMDActor::IKSolve(int frameNo) {
 		});
 	//まずはIKのターゲットボーンを動かす
 	for (auto& ik : _ikData) {
-		auto ikEnableIt= it->ikEnableTable.find(_boneNameArray[ik.boneIdx]);
-		if (ikEnableIt != it->ikEnableTable.end()) {
-			if (!ikEnableIt->second) {
-				continue;
+		if (it != _ikEnableData.rend()) {
+			auto ikEnableIt = it->ikEnableTable.find(_boneNameArray[ik.boneIdx]);
+			if (ikEnableIt != it->ikEnableTable.end()) {
+				if (!ikEnableIt->second) {
+					continue;
+				}
 			}
 		}
 		auto childrenNodesCount = ik.nodeIdxes.size();
