@@ -565,11 +565,11 @@ PMDActor::IKSolve(int frameNo) {
 			return ikenable.frameNo <= frameNo;
 		});
 	//まずはIKのターゲットボーンを動かす
-	for (auto& ik : _ikData) {
+	for (auto& ik : _ikData) {//IK解決のためのループ
 		if (it != _ikEnableData.rend()) {
 			auto ikEnableIt = it->ikEnableTable.find(_boneNameArray[ik.boneIdx]);
 			if (ikEnableIt != it->ikEnableTable.end()) {
-				if (!ikEnableIt->second) {
+				if (!ikEnableIt->second) {//もしOFFなら打ち切ります
 					continue;
 				}
 			}
