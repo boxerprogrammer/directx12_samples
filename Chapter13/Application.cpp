@@ -74,37 +74,37 @@ Application::Initialize() {
 		return false;
 	}
 	_pmdRenderer->Init();
-	//_actor.reset(new PMDActor("Model/初音ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/飛鳥/飛鳥Ver1.10SW.pmd"));
-	//_actor.reset(new PMDActor("Model/satori/古明地さとり152Normal.pmd"));
-	_actor.reset(new PMDActor(_dx12, "Model/初音ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/巡音ルカ.pmd"));
+	_actor=make_shared< PMDActor>(_dx12, "Model/初音ミク.pmd");
 	_actor->Move(-10, 0, 0);
-	
+	_actor->LoadVMDData("motion/yagokoro.vmd");
 	_pmdRenderer->AddActor(_actor);
-	_pmdRenderer->AddActor("Model/巡音ルカ.pmd");
 
-	auto satori = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
-	satori->Move(-5, 0, 5);
-	_pmdRenderer->AddActor(satori);
 
-	auto ruka = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
-	ruka->Move(10, 0, 10);
+	auto ruka = make_shared<PMDActor>(_dx12, "Model/巡音ルカ.pmd");
+	ruka->LoadVMDData("motion/yagokoro.vmd");
 	_pmdRenderer->AddActor(ruka);
 
-	//auto satori = make_shared<PMDActor>(_dx12, "Model/satori/古明地さとり152Normal.pmd");
-	//satori->Move(10, 0, 0);
-	//_pmdRenderer->AddActor(satori);
+	auto haku = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
+	haku->Move(-5, 0, 5);
+	haku->LoadVMDData("motion/yagokoro.vmd");
+	_pmdRenderer->AddActor(haku);
 
-	auto hibiki = make_shared<PMDActor>(_dx12, "Model/咲音メイコ.pmd");
-	hibiki->Move(-10, 0, 10);
-	_pmdRenderer->AddActor(hibiki);
+	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
+	rin->LoadVMDData("motion/yagokoro.vmd");
+	rin->Move(10, 0, 10);
+	_pmdRenderer->AddActor(rin);
+
 	
-	auto katu = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
-	katu->Move(10, 0, 0);
-	_pmdRenderer->AddActor(katu);
-	//_dx12->AddPMDActor(&*_actor);
-
+	auto meiko = make_shared<PMDActor>(_dx12, "Model/咲音メイコ.pmd");
+	meiko->Move(-10, 0, 10);
+	meiko->LoadVMDData("motion/yagokoro.vmd");
+	_pmdRenderer->AddActor(meiko);
+	
+	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
+	kaito->Move(10, 0, 0);
+	kaito->LoadVMDData("motion/yagokoro.vmd");
+	_pmdRenderer->AddActor(kaito);
+	
 
 	_pmdRenderer->AnimationStart();
 	return true;
