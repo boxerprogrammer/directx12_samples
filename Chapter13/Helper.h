@@ -24,9 +24,16 @@ extern unsigned int AligmentedValue(unsigned int size, unsigned int alignment = 
 
 
 //１バイトstringをワイド文字wstringに変換する
-std::wstring WStringFromString(const std::string& str);
+extern std::wstring WStringFromString(const std::string& str);
 
 ///拡張子を返す
 ///@param path 元のパス文字列
 ///@return 拡張子文字列
-std::wstring GetExtension(const std::wstring& path);
+extern std::wstring GetExtension(const std::wstring& path);
+
+///ガウスウェイト値を返す
+///@param count 片側いくつのウェイト値を持っておくか
+///@param s ガウス関数におけるσ値
+///@retval ガウスウェイト配列(countで指定された可変長配列)
+///@remarks 全てのウェイト値を足したら1になるはずなので
+extern std::vector<float> GetGaussianWeights(size_t count, float s);

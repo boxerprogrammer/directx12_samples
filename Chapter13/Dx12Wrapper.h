@@ -109,13 +109,15 @@ private:
 	//いわゆるペラポリに張り付けるための絵の
 	//メモリリソースとそのビュー
 	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
-	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
+	ComPtr<ID3D12DescriptorHeap> _peraRegisterHeap;
 	ComPtr<ID3D12Resource> _peraResource;
 	//１枚目ペラポリのためのリソースとビューを
 	//作成
 	bool CreatePera1ResourceAndView();
 
-	
+	ComPtr<ID3D12Resource> _bokehParamBuffer;
+	//ボケに関するバッファを作り中にボケパラメータを代入する
+	bool CreateBokehResource();
 
 
 public:
