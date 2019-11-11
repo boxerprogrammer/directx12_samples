@@ -179,11 +179,14 @@ Application::Run() {
 		_pmdRenderer->Draw();
 		_dx12->PostDrawToPera1();
 
-		_dx12->Clear();
+		
 
 		//_pmdRenderer->Update();
 		//_pmdRenderer->BeforeDraw();
 		
+		_dx12->DrawHorizontalBokeh();
+
+		_dx12->Clear();
 		_dx12->Draw(_pmdRenderer);
 
 		//_pmdRenderer->Draw();

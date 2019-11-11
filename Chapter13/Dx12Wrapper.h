@@ -96,14 +96,15 @@ private:
 	DirectX::XMFLOAT3 _eye;
 	DirectX::XMFLOAT3 _target;
 	DirectX::XMFLOAT3 _up;
-	float _fov = DirectX::XM_PI/6;
+	float _fov = DirectX::XM_PI/6;//デフォルト30°
 
 	bool CreateCommandList();
 	void Barrier(ID3D12Resource* p,
 		D3D12_RESOURCE_STATES before, 
 		D3D12_RESOURCE_STATES after);
 
-	//std::vector<PMDActor*> _actors;
+	
+
 
 	//1枚目レンダリング用
 	//いわゆるペラポリに張り付けるための絵の
@@ -113,12 +114,26 @@ private:
 	ComPtr<ID3D12Resource> _peraResource;
 	//１枚目ペラポリのためのリソースとビューを
 	//作成
-	bool CreatePera1ResourceAndView();
+	bool CreatePeraResourcesAndView();
 
-	ComPtr<ID3D12Resource> _bokehParamBuffer;
+	ComPtr<ID3D12Resource> _bokehParamResource;
 	//ボケに関するバッファを作り中にボケパラメータを代入する
-	bool CreateBokehResource();
+	bool CreateBokehParamResource();
 
+	//ペラポリ2枚目
+	ComPtr<ID3D12Resource> _peraResource2;
+	ComPtr<ID3D12PipelineState> _peraPipeline2;
+
+	//ペラポリ用頂点バッファ(N字の4点)
+	ComPtr<ID3D12Resource> _peraVB;
+	D3D12_VERTEX_BUFFER_VIEW _peraVBV;
+
+	//ペラポリ用パイプライン＆ルートシグネチャ
+	ComPtr<ID3D12PipelineState> _peraPipeline;
+	ComPtr<ID3D12RootSignature> _peraRS;
+
+	bool CreatePeraVertex();
+	bool CreatePeraPipeline();
 
 public:
 	Dx12Wrapper(HWND hwnd);
@@ -138,16 +153,6 @@ public:
 	ComPtr<ID3D12Resource> BlackTexture();
 	ComPtr<ID3D12Resource> GradTexture();
 
-	//ペラポリ用頂点バッファ(N字の4点)
-	ComPtr<ID3D12Resource> _peraVB;
-	D3D12_VERTEX_BUFFER_VIEW _peraVBV;
-
-	//ペラポリ用パイプライン＆ルートシグネチャ
-	ComPtr<ID3D12PipelineState> _peraPipeline;
-	ComPtr<ID3D12RootSignature> _peraRS;
-
-	bool CreatePeraVertex();
-	bool CreatePeraPipeline();
 
 	//ペラポリゴンへの描画準備
 	bool PreDrawToPera1();
@@ -163,6 +168,8 @@ public:
 	//描画
 	void Draw(std::shared_ptr<PMDRenderer> renderer);
 
+	void DrawHorizontalBokeh();
+
 	void SetCameraSetting();
 
 	//フリップ
@@ -176,8 +183,6 @@ public:
 	void MoveEyePosition(float x, float y, float z);
 
 	DirectX::XMVECTOR GetCameraPosition();
-
-	void AddPMDActor(PMDActor* actor);
 
 };
 
