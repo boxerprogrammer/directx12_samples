@@ -546,6 +546,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 	gpsDesc.SampleDesc.Quality = 0;
 	gpsDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	gpsDesc.pRootSignature = _peraRS.Get();
+	//1枚目
 	result = _dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(_peraPipeline.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
 		assert(0);
@@ -566,15 +567,13 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 void 
 Dx12Wrapper::DrawHorizontalBokeh() {//横ボケ画像を描画する
-	//バックバッファのインデックスを取得する
+	//2枚目のリソースの状態をレンダーターゲットに遷移させる
 	Barrier(_peraResource2.Get(),
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	
 	auto rtvHeapPointer = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
+	//2枚目RTVなので進ませてレンダーターゲットを割り当てる
 	rtvHeapPointer.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
 	_cmdList->OMSetRenderTargets(1, &rtvHeapPointer, false, nullptr);
 
 	//クリアカラー		 R   G   B   A
@@ -1051,7 +1050,7 @@ Dx12Wrapper::CreatePeraResourcesAndView() {
 	//ただしその前にでスクリプタヒープが必要
 	//もともと作っているヒープの情報でもう一枚作る
 	auto heapDesc = _rtvDescHeap->GetDesc();
-	heapDesc.NumDescriptors = 2;//でもデスクリプタは１つ
+	heapDesc.NumDescriptors = 2;//ペラ１枚目と2枚目
 	result = _dev->CreateDescriptorHeap(&heapDesc, 
 		IID_PPV_ARGS(_peraRTVHeap.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
@@ -1064,6 +1063,7 @@ Dx12Wrapper::CreatePeraResourcesAndView() {
 	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	auto handle = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
 	//まだデスクリプタヒープのみで、ビューを作っていないので作る
+	//1枚目
 	_dev->CreateRenderTargetView(
 		_peraResource.Get(),
 		&rtvDesc, 
@@ -1076,7 +1076,8 @@ Dx12Wrapper::CreatePeraResourcesAndView() {
 		handle);
 
 	//シェーダリソースビュービューを作る
-	//ただしその前にでスクリプタヒープが必要
+	//ただしその前にガウス用パラメータのデスクリプタも用意するので
+	//定数→1枚目ペラテクスチャ→2枚目ペラテクスチャの順に並べます。
 	heapDesc.NumDescriptors = 3;
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -1103,12 +1104,13 @@ Dx12Wrapper::CreatePeraResourcesAndView() {
 	srvDesc.Format = rtvDesc.Format;
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	//1枚目
 	_dev->CreateShaderResourceView(_peraResource.Get(),
 		&srvDesc,
 		handle);
-
+	//2枚目
 	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
 	_dev->CreateShaderResourceView(_peraResource2.Get(),
 		&srvDesc,
 		handle);
