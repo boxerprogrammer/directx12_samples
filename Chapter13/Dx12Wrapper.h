@@ -103,7 +103,9 @@ private:
 		D3D12_RESOURCE_STATES before, 
 		D3D12_RESOURCE_STATES after);
 
-	
+	//歪みテクスチャ用
+	ComPtr<ID3D12DescriptorHeap> _distortionSRVHeap;
+	ComPtr<ID3D12Resource> _distortionTexBuffer;
 
 
 	//1枚目レンダリング用
