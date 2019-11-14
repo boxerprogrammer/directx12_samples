@@ -3,7 +3,7 @@ cbuffer Weight : register(b0) {
 	float4 bkweights[2];
 };
 Texture2D<float4> tex : register(t0);
-
+Texture2D<float4> distTex : register(t1);
 
 SamplerState smp : register(s0);
 
@@ -25,6 +25,12 @@ float4 VerticalBokehPS(Output input) : SV_TARGET{
 	float dx = 1.0f / w;
 	float dy = 1.0f / h;
 	float4 ret = float4(0, 0, 0, 0);
+	float2 nmTex= distTex.Sample(smp, input.uv).xy;
+	nmTex = nmTex * 2.0f - 1.0f;
+	//nmTex‚Ì”ÍˆÍ‚Í-1`1‚¾‚ªA•1‚ªƒeƒNƒXƒ`ƒƒ‚P–‡‚Ì
+	//‘å‚«‚³‚Å‚ ‚è-1`1‚Å‚Í‚ä‚ª‚İ‚·‚¬‚é‚½‚ß0.1‚ğæZ‚µ‚Ä‚¢‚é
+	return tex.Sample(smp, input.uv+nmTex*0.1f);
+
 	float4 col = tex.Sample(smp, input.uv);
 	ret += bkweights[0] * col;
 	for (int i = 1; i < 8; ++i) {
@@ -47,6 +53,9 @@ float4 PS(Output input) : SV_TARGET{
 	float dx = 1.0f / w;
 	float dy = 1.0f / h;
 	float4 ret = float4(0, 0, 0, 0);
+	
+	
+
 	float4 col = tex.Sample(smp, input.uv);
 	ret += bkweights[0] * col;
 	for (int i = 1; i < 8; ++i) {

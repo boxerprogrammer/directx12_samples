@@ -150,7 +150,9 @@ Dx12Wrapper::Init() {
 	if (!CreateBokehParamResource()) {
 		return false;
 	}
-
+	if (!CreateEffectBufferAndView()) {
+		return false;
+	}
 	//ƒyƒ‰ƒ|ƒŠ—p
 	if (!CreatePeraResourcesAndView()) {
 		return false;
@@ -470,16 +472,20 @@ Dx12Wrapper::DrawToPera1(shared_ptr<PMDRenderer> renderer) {
 
 bool 
 Dx12Wrapper::CreatePeraPipeline() {
-	D3D12_DESCRIPTOR_RANGE range[2] = {};
-	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//t
+	D3D12_DESCRIPTOR_RANGE range[3] = {};
+	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[0].BaseShaderRegister = 0;//0
 	range[0].NumDescriptors = 1;
 
-	range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//b
+	range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[1].BaseShaderRegister = 0;//0
 	range[1].NumDescriptors = 1;
 
-	D3D12_ROOT_PARAMETER rp[2] = {};
+	range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
+	range[2].BaseShaderRegister = 1;//1
+	range[2].NumDescriptors = 1;
+
+	D3D12_ROOT_PARAMETER rp[3] = {};
 	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//
 	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rp[0].DescriptorTable.pDescriptorRanges = &range[0];
@@ -490,11 +496,18 @@ Dx12Wrapper::CreatePeraPipeline() {
 	rp[1].DescriptorTable.pDescriptorRanges = &range[1];
 	rp[1].DescriptorTable.NumDescriptorRanges = 1;
 
+	rp[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//
+	rp[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rp[2].DescriptorTable.pDescriptorRanges = &range[2];
+	rp[2].DescriptorTable.NumDescriptorRanges = 1;
+
 	D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
-	rsDesc.NumParameters = 2;
+	rsDesc.NumParameters = 3;
 	rsDesc.pParameters = rp;
 	
 	D3D12_STATIC_SAMPLER_DESC sampler = CD3DX12_STATIC_SAMPLER_DESC(0);
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	rsDesc.pStaticSamplers = &sampler;
 	rsDesc.NumStaticSamplers = 1;
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -621,6 +634,7 @@ Dx12Wrapper::Draw(shared_ptr<PMDRenderer> renderer) {
 	
 	_cmdList->SetGraphicsRootSignature(_peraRS.Get());
 	_cmdList->SetDescriptorHeaps(1, _peraRegisterHeap.GetAddressOf());
+	
 	auto handle = _peraRegisterHeap->GetGPUDescriptorHandleForHeapStart();
 	_cmdList->SetGraphicsRootDescriptorTable(0, handle);
 	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -629,6 +643,8 @@ Dx12Wrapper::Draw(shared_ptr<PMDRenderer> renderer) {
 	_cmdList->SetPipelineState(_peraPipeline2.Get());
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	_cmdList->IASetVertexBuffers(0, 1, &_peraVBV);
+	_cmdList->SetDescriptorHeaps(1, _distortionSRVHeap.GetAddressOf());
+	_cmdList->SetGraphicsRootDescriptorTable(2, _distortionSRVHeap->GetGPUDescriptorHandleForHeapStart());
 	_cmdList->DrawInstanced(4, 1, 0, 0);
 }
 
@@ -843,6 +859,36 @@ Dx12Wrapper::CreateBokehParamResource() {
 	copy(weights.begin(), weights.end(), mappedWeight);
 	_bokehParamResource->Unmap(0, nullptr);
 	return true;
+}
+
+bool 
+Dx12Wrapper::CreateEffectBufferAndView() {
+	if (!LoadPictureFromFile(L"normal/WireReinforced_N.jpg", _distortionTexBuffer)) {
+		return false;
+	}
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	heapDesc.NumDescriptors = 1;
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	auto result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_distortionSRVHeap));
+	if (!CheckResult(result)) {
+		assert(0);
+		return false;
+	}
+	auto desc=_distortionTexBuffer->GetDesc();
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Format = desc.Format;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	_dev->CreateShaderResourceView(
+		_distortionTexBuffer.Get(),
+		&srvDesc,
+		_distortionSRVHeap->GetCPUDescriptorHandleForHeapStart());
+
+	//_dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	//	D3D12_HEAP_FLAG_NONE,
+	//	);
 }
 
 bool

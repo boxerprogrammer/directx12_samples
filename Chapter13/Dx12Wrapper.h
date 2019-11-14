@@ -106,6 +106,7 @@ private:
 	//歪みテクスチャ用
 	ComPtr<ID3D12DescriptorHeap> _distortionSRVHeap;
 	ComPtr<ID3D12Resource> _distortionTexBuffer;
+	bool CreateEffectBufferAndView();
 
 
 	//1枚目レンダリング用
