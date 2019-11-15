@@ -656,7 +656,7 @@ void Dx12Wrapper::SetCameraSetting()
 		XMLoadFloat3(&_eye),
 		XMLoadFloat3(&_target),
 		XMLoadFloat3(&_up));
-	_mappedScene->proj = _mappedScene->proj = XMMatrixPerspectiveFovLH(
+	_mappedScene->proj =  XMMatrixPerspectiveFovLH(
 		_fov,
 		static_cast<float>(wsize.width) / static_cast<float>(wsize.height),
 		1.0f,

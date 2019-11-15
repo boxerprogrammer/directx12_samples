@@ -867,7 +867,7 @@ PMDActor::Draw() {
 		cmdlist->SetGraphicsRootDescriptorTable(0, matHeapAddress);
 		auto& material = _materials[i];
 		cmdlist->DrawIndexedInstanced(material.indicesNum,
-			1,
+			2,
 			indexOffset, 0, 0);
 		indexOffset += material.indicesNum;
 		matHeapAddress.ptr += incSize * 5;//マテリアルとテクスチャとSPHぶん

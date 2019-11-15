@@ -17,6 +17,7 @@ Texture2D<float4> toon : register(t3);//トゥーンテクスチャ
 cbuffer sceneBuffer : register(b1) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
+	matrix shadow;//影
 	float3 eye;//視点
 };
 
@@ -37,28 +38,27 @@ struct Output {
 	float4 pos : POSITION;
 	float4 normal : NORMAL;
 	float2 uv : TEXCOORD;
-	float weight : WEIGHT;
-	float boneno : BONENO;
+	uint instNo:NO;
 };
 
 //頂点シェーダ(頂点情報から必要なものを次の人へ渡す)
 //パイプラインに投げるためにはSV_POSITIONが必要
-Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT) {
+Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo: SV_InstanceID) {
 	//1280,720を直で使って構わない。
 	Output output;
 	float fWeight = float(weight) / 100.0f;
 	matrix conBone = bones[boneno.x]*fWeight + 
 						bones[boneno.y]*(1.0f - fWeight);
-
-	output.pos = mul(world, 
-						mul(conBone,pos)
-					);
+	output.pos = mul(world,	mul(conBone,pos));
+	if (instNo > 0) {
+		output.pos = mul(shadow, output.pos);
+	}
 	output.svpos = mul(proj,mul(view, output.pos));
 	output.uv = uv;
 	normal.w = 0;
 	output.normal = mul(world,normal);
-	output.weight = (float)weight/100.0f;
-	output.boneno = boneno[0]/122.0;
+	
+	output.instNo = instNo;
 	//output.uv = uv;
 	return output;
 }
@@ -66,6 +66,9 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 
 //ピクセルシェーダ
 float4 PS(Output input):SV_TARGET {
+	if (input.instNo>0) {
+		return float4(0, 0, 0, 1);
+	}
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);

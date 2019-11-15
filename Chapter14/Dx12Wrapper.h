@@ -86,6 +86,7 @@ private:
 	struct SceneMatrix {
 		DirectX::XMMATRIX view;//ビュー
 		DirectX::XMMATRIX proj;//プロジェクション
+		DirectX::XMMATRIX shadow;//影
 		DirectX::XMFLOAT3 eye;//視点
 	};
 	SceneMatrix* _mappedScene;
@@ -96,6 +97,9 @@ private:
 	DirectX::XMFLOAT3 _eye;
 	DirectX::XMFLOAT3 _target;
 	DirectX::XMFLOAT3 _up;
+	//平行ライトの向き
+	DirectX::XMFLOAT3 _parallelLightVec;
+
 	float _fov = DirectX::XM_PI/6;//デフォルト30°
 
 	bool CreateCommandList();
