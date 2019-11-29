@@ -147,10 +147,10 @@ private:
 	//歪み用ノーマルマップ
 	ComPtr<ID3D12Resource> _distBuff;
 	ComPtr<ID3D12DescriptorHeap> _distSRVHeap;
-	//深度値用テクスチャ
+	//深度値テクスチャ用
 	ComPtr<ID3D12DescriptorHeap> _depthSRVHeap;
 	bool CreateDistortion();
-	bool CreateDepthSRVForTest();
+	bool CreateDepthSRV();
 
 	//プリミティブ用頂点バッファ
 	std::vector<ComPtr<ID3D12Resource>> _primitivesVB;

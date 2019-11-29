@@ -97,7 +97,7 @@ Dx12Wrapper::~Dx12Wrapper()
 }
 
 bool
-Dx12Wrapper::CreateDepthSRVForTest() {
+Dx12Wrapper::CreateDepthSRV() {
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	heapDesc.NodeMask = 0;
@@ -114,13 +114,12 @@ Dx12Wrapper::CreateDepthSRVForTest() {
 	resDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
 	auto handle=_depthSRVHeap->GetCPUDescriptorHandleForHeapStart();
-
+	//通常デプス→テクスチャ用
 	_dev->CreateShaderResourceView(_depthBuffer.Get(),
 		&resDesc,
 		handle);
-
+	//ライトデプス→テクスチャ用
 	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
 	_dev->CreateShaderResourceView(_lightDepthBuffer.Get(),
 		&resDesc,
 		handle);
@@ -210,7 +209,7 @@ Dx12Wrapper::Init() {
 		return false;
 	}
 	//深度バッファを画像として使うビューを作成
-	if (!CreateDepthSRVForTest()) {
+	if (!CreateDepthSRV()) {
 		return false;
 	}
 
@@ -563,8 +562,8 @@ Dx12Wrapper::CreateDepthBuffer() {
 		return false;
 	}
 
-	resdesc.Width = shadow_difinition;
-	resdesc.Height = shadow_difinition;
+	resdesc.Width = shadow_difinition;//ライトデプス幅
+	resdesc.Height = shadow_difinition;//ライトデプス高
 	result = _dev->CreateCommittedResource(&heapprop,
 		D3D12_HEAP_FLAG_NONE,
 		&resdesc,
@@ -597,13 +596,12 @@ Dx12Wrapper::CreateDSV() {
 	viewDesc.Format = DXGI_FORMAT_D32_FLOAT;
 
 	auto handle=_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-
+	//通常デプス
 	_dev->CreateDepthStencilView(_depthBuffer.Get(),
 		&viewDesc,
 		handle);
-
 	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	
+	//ライトデプス
 	_dev->CreateDepthStencilView(_lightDepthBuffer.Get(),
 		&viewDesc,
 		handle);
@@ -680,6 +678,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 	range[2].BaseShaderRegister = 1;//1
 	range[2].NumDescriptors = 1;
 
+	//深度値テクスチャ用
 	range[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[3].BaseShaderRegister = 2;//2
 	range[3].NumDescriptors = 2;//2個使うよ(t2,t3)
@@ -809,7 +808,7 @@ Dx12Wrapper::Draw(shared_ptr<PMDRenderer> renderer) {
 	_cmdList->SetDescriptorHeaps(1, _distSRVHeap.GetAddressOf());
 	_cmdList->SetGraphicsRootDescriptorTable(2, _distSRVHeap->GetGPUDescriptorHandleForHeapStart());
 
-	//テスト用深度バッファテクスチャ
+	//深度バッファテクスチャ
 	_cmdList->SetDescriptorHeaps(1, _depthSRVHeap.GetAddressOf());
 	_cmdList->SetGraphicsRootDescriptorTable(3, _depthSRVHeap->GetGPUDescriptorHandleForHeapStart());
 
@@ -843,7 +842,7 @@ void Dx12Wrapper::SetCameraSetting()
 
 	float armLength;//カメラアーム長(視点から注視点の長さ)
 	armLength=XMVector3Length(XMVectorSubtract( targetPos, eyePos)).m128_f32[0];
-	auto lightPos= targetPos+XMVector3Normalize(lightVec)*armLength;
+	auto lightPos= targetPos+XMVector3Normalize(lightVec)*XMVector3Length(XMVectorSubtract(targetPos, eyePos)).m128_f32[0];
 	_mappedScene->lightCamera = XMMatrixLookAtLH(lightPos, targetPos, upVec)*
 		//XMMatrixPerspectiveFovLH(XM_PIDIV4, 1280.0f/720.0f, 1.0f, 100.0f);
 		XMMatrixOrthographicLH(40,40,1.0f,100.0f);

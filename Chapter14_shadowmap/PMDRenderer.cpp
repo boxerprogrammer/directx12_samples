@@ -302,12 +302,11 @@ PMDRenderer::CreatePipeline() {
 	if (!CheckResult(result, errBlob)) {
 		return false;
 	}
-	result = D3DCompileFromFile(L"BasicShader.hlsl", nullptr, nullptr, "shadowPS", "ps_5_0", 0, 0, &psBlob, &errBlob);
-	if (!CheckResult(result, errBlob)) {
-		return false;
-	}
+
 	plsDesc.VS = CD3DX12_SHADER_BYTECODE(vsBlob);
-	plsDesc.PS = CD3DX12_SHADER_BYTECODE(psBlob);
+	plsDesc.PS.BytecodeLength =0 ;
+	plsDesc.PS.pShaderBytecode = nullptr;
+	plsDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	result = _dx->Device()->CreateGraphicsPipelineState(&plsDesc, IID_PPV_ARGS(_plsShadow.ReleaseAndGetAddressOf()));
 
 	if (!CheckResult(result)) {

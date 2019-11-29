@@ -2,26 +2,7 @@
 #include"PMDActor.h"
 #include"Dx12Wrapper.h"
 #include"PMDRenderer.h"
-#include<Effekseer.h>
-#include<EffekseerRendererDX12.h>
 
-//----エフェクトに必要なものの基本--------------
-//エフェクトレンダラ
-EffekseerRenderer::Renderer* _efkRenderer=nullptr;
-//エフェクトマネジャ
-Effekseer::Manager* _efkManager=nullptr;
-
-//----DX12やVulkan,metalなどのコマンドリスト系への対応のためのもの----
-//メモリプール(詳しくは分かってない)
-EffekseerRenderer::SingleFrameMemoryPool* _efkMemoryPool = nullptr;
-//コマンドリスト(DX12とかVulkanへの対応のため)
-EffekseerRenderer::CommandList* _efkCmdList = nullptr;
-
-//----エフェクト再生に必要なもの---------------
-//エフェクト本体(エフェクトファイルに対応)
-Effekseer::Effect* _effect=nullptr;
-// エフェクトハンドル(再生中のエフェクトに対応)
-Effekseer::Handle _efkHandle;
 
 using namespace std;
 constexpr int window_width = 1280;
@@ -93,91 +74,28 @@ Application::Initialize() {
 	if (!_dx12->Init()) {
 		return false;
 	}
-
-	DXGI_FORMAT bbFormats[] = { DXGI_FORMAT_R8G8B8A8_UNORM,DXGI_FORMAT_R8G8B8A8_UNORM };
-	_efkRenderer = EffekseerRendererDX12::Create(
-		_dx12->Device(),//デバイス
-		_dx12->CmdQue(), //コマンドキュー
-		2, //バックバッファの数
-		bbFormats, //レンダーターゲットフォーマット
-		1, //レンダーターゲット数
-		false, //デプスありか？
-		false, //反対デプスありか？
-		2000);//パーティクルの数
-
-	_efkManager = Effekseer::Manager::Create(2000);
-
-
-	//「系」を左手系にしておく
-	_efkManager->SetCoordinateSystem(Effekseer::CoordinateSystem::LH);
-
-
-	// 描画用インスタンスから描画機能を設定
-	_efkManager->SetSpriteRenderer(_efkRenderer->CreateSpriteRenderer());
-	_efkManager->SetRibbonRenderer(_efkRenderer->CreateRibbonRenderer());
-	_efkManager->SetRingRenderer(_efkRenderer->CreateRingRenderer());
-	_efkManager->SetTrackRenderer(_efkRenderer->CreateTrackRenderer());
-	_efkManager->SetModelRenderer(_efkRenderer->CreateModelRenderer());
-
-	// 描画用インスタンスからテクスチャの読込機能を設定
-	// 独自拡張可能、現在はファイルから読み込んでいる。
-	_efkManager->SetTextureLoader(_efkRenderer->CreateTextureLoader());
-	_efkManager->SetModelLoader(_efkRenderer->CreateModelLoader());
-
-	//DX12特有の処理
-	_efkMemoryPool = EffekseerRendererDX12::CreateSingleFrameMemoryPool(_efkRenderer);
-	_efkCmdList = EffekseerRendererDX12::CreateCommandList(_efkRenderer, _efkMemoryPool);
-	_efkRenderer->SetCommandList(_efkCmdList);
-
-	// 投影行列を設定
-	_efkRenderer->SetProjectionMatrix(
-		::Effekseer::Matrix44().PerspectiveFovLH(90.0f / 180.0f * 3.14f, (float)1280 / (float)720, 1.0f, 50.0f));
-
-	// カメラ行列を設定
-	_efkRenderer->SetCameraMatrix(
-		::Effekseer::Matrix44().LookAtLH(Effekseer::Vector3D(0.0f, 5.0f, -25.0f), ::Effekseer::Vector3D(0.0f, 5.0f, 0.0f), ::Effekseer::Vector3D(0.0f, 1.0f, 0.0f)));
 	_pmdRenderer->Init();
-
-
-	// エフェクトの読込
-	_effect = Effekseer::Effect::Create(_efkManager, (const EFK_CHAR*)L"effect/suzuki.efk",1.0f, (const EFK_CHAR*)L"effect");
-
-	// エフェクトの再生
-	_efkHandle = _efkManager->Play(_effect, 0, 0, 0);
-
-	
-
-
-	//_actor.reset(new PMDActor("Model/初音ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/飛鳥/飛鳥Ver1.10SW.pmd"));
-	//_actor.reset(new PMDActor("Model/satori/古明地さとり152Normal.pmd"));
-	_actor.reset(new PMDActor(_dx12, "Model/sakura/mikuXS桜ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/巡音ルカ.pmd"));
+	_actor.reset(new PMDActor(_dx12,"Model/初音ミクmetal.pmd"));
 	_actor->Move(-10, 0, 10);
 	
 	_pmdRenderer->AddActor(_actor);
-	_pmdRenderer->AddActor("Model/初音ミクmetal.pmd");
+	_pmdRenderer->AddActor("Model/初音ミク.pmd");
 
-	auto satori = make_shared<PMDActor>(_dx12, "Model/satori/古明地さとり152Normal.pmd");
-	satori->Move(-5, 0, 5);
-	_pmdRenderer->AddActor(satori);
+	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
+	kaito->Move(-5, 0, 5);
+	_pmdRenderer->AddActor(kaito);
 
 	auto ruka = make_shared<PMDActor>(_dx12, "Model/巡音ルカ.pmd");
 	ruka->Move(10, 0, 10);
 	_pmdRenderer->AddActor(ruka);
 
-	//auto satori = make_shared<PMDActor>(_dx12, "Model/satori/古明地さとり152Normal.pmd");
-	//satori->Move(10, 0, 0);
-	//_pmdRenderer->AddActor(satori);
-
-	auto hibiki = make_shared<PMDActor>(_dx12, "Model/hibiki/我那覇響v1.pmd");
-	hibiki->Move(-10, 0, 0);
-	_pmdRenderer->AddActor(hibiki);
+	auto meiko = make_shared<PMDActor>(_dx12, "Model/咲音メイコ.pmd");
+	meiko->Move(-10, 0, 0);
+	_pmdRenderer->AddActor(meiko);
 	
-	auto katu = make_shared<PMDActor>(_dx12, "Model/ikaruga/斑鳩Ver1.10SW.pmd");
-	katu->Move(10, 0, 0);
-	_pmdRenderer->AddActor(katu);
-	//_dx12->AddPMDActor(&*_actor);
+	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
+	rin->Move(10, 0, 0);
+	_pmdRenderer->AddActor(rin);
 
 
 	_pmdRenderer->AnimationStart();
@@ -188,7 +106,6 @@ void
 Application::Run() {
 	ShowWindow(_hwnd, SW_SHOW);
 	MSG msg = {};
-	bool shotFlg = false;
 	float fov = 3.1415926535897f / 4.0f;//π/4
 	while (true) {//メインループ
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -243,19 +160,7 @@ Application::Run() {
 		if (keycode['Y'] & 0x80) {
 			_actor->Rotate(0, 0, 0.01f);
 		}
-		if (keycode[VK_SPACE] & 0x80) {
-			if (!shotFlg) {
-				if (_efkManager->Exists(_efkHandle)) {
-					_efkManager->StopEffect(_efkHandle);
-				}
-				// エフェクトの再生
-				_efkHandle = _efkManager->Play(_effect, 0, 0, 0);
-			}
-			shotFlg = true;
-		}
-		else {
-			shotFlg = false;
-		}
+
 
 		_actor->Move(px, py, pz);
 		
@@ -274,20 +179,11 @@ Application::Run() {
 
 		//１枚目(ペラポリへ)
 		_dx12->PreDrawToPera1();
-		_dx12->DrawPrimitiveShapes();
+		//_dx12->DrawPrimitiveShapes();
 		_pmdRenderer->BeforeDraw();
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
 
-		//エフェクト描画
-		_efkManager->Update();//マネージャの更新(時間更新)
-		_efkMemoryPool->NewFrame();//適切なバックバッファを選択
-		EffekseerRendererDX12::BeginCommandList(_efkCmdList, _dx12->CmdList());//
-		_efkRenderer->BeginRendering();//描画前処理
-		_efkManager->Draw();//エフェクト描画
-		_efkRenderer->EndRendering();//描画後処理
-		EffekseerRendererDX12::EndCommandList(_efkCmdList);
-		
 		//2枚目(ペラポリ1→ペラポリ2へ)
 		//_dx12->DrawToPera2();
 

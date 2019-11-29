@@ -1,7 +1,7 @@
 Texture2D<float4> tex : register(t0);
 Texture2D<float4> distTex : register(t1);
 
-//深度値実験用
+//深度値検証用
 Texture2D<float> depthTex : register(t2);//デプス
 Texture2D<float> lightDepthTex : register(t3);//ライトデプス
 
@@ -28,17 +28,15 @@ Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
 }
 
 float4 PS(Output input) : SV_TARGET{
-	
-	
-	if (input.uv.x<0.2&&input.uv.y < 0.2) {
-		float depth = depthTex.Sample(smp, input.uv*5);
-		depth = 1.0f - pow(depth, 30);
-		return float4(depth, depth, depth, 1);
-	}else if (input.uv.x < 0.2&&input.uv.y < 0.4) {
-		float depth = lightDepthTex.Sample(smp, (input.uv-float2(0,0.2)) * 5);
-		//depth = 1.0f - depth;
-		return float4(depth, depth, depth, 1);
-	}
+	//if (input.uv.x<0.2&&input.uv.y < 0.2) {
+	//	float depth = depthTex.Sample(smp, input.uv*5);
+	//	depth = 1.0f - pow(depth, 30);
+	//	return float4(depth, depth, depth, 1);
+	//}else if (input.uv.x < 0.2&&input.uv.y < 0.4) {
+	//	float depth = lightDepthTex.Sample(smp, (input.uv-float2(0,0.2)) * 5);
+	//	//depth = 1.0f - depth;
+	//	return float4(depth, depth, depth, 1);
+	//}
 
 
 	float2 nmXY=distTex.Sample(smp,input.uv).rg;

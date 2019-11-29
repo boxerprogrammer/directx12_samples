@@ -15,8 +15,8 @@ Texture2D<float4> sph : register(t1);//スフィアマップ(乗算)
 Texture2D<float4> spa : register(t2);//スフィアマップ(加算)
 Texture2D<float4> toon : register(t3);//トゥーンテクスチャ
 
-//シャドウマップ用
-Texture2D<float> lightDepthTex : register(t4);//デプス
+//シャドウマップ用ライト深度テクスチャ
+Texture2D<float> lightDepthTex : register(t4);
 
 //シーン管理用スロット
 cbuffer sceneBuffer : register(b1) {
@@ -45,8 +45,6 @@ struct Output {
 	float4 tpos : TPOS;
 	float4 normal : NORMAL;
 	float2 uv : TEXCOORD;
-	float weight : WEIGHT;
-	float boneno : BONENO;
 	float instNo : INSTNO;
 };
 
@@ -94,26 +92,20 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 	output.pos = mul(world, 
 						mul(conBone,pos)
 					);
-	//if (instNo == 0) {
-	//	output.pos = mul(shadow, output.pos);
-	//}
 	output.instNo = (float)instNo;
-
 	output.svpos = mul(proj,mul(view, output.pos));
-	//output.svpos = mul(lightCamera, output.pos);
 	output.tpos = mul(lightCamera, output.pos);
+//	output.tpos.w = 1;
 	output.uv = uv;
 	normal.w = 0;
 	output.normal = mul(world,normal);
-	output.weight = (float)weight/100.0f;
-	output.boneno = boneno[0]/122.0;
-	//output.uv = uv;
 	return output;
 }
 
 
 //ピクセルシェーダ
 float4 PS(Output input):SV_TARGET {
+	return float4(input.tpos.w, input.tpos.w, input.tpos.w, 1);
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);
@@ -137,7 +129,6 @@ float4 PS(Output input):SV_TARGET {
 
 	float4 texCol =  tex.Sample(smp, input.uv);
 	
-	//col.rgb= pow(col.rgb, 1.0 / 2.2);
 	float2 spUV= (input.normal.xy
 		*float2(1, -1) //まず上下だけひっくりかえす
 		+ float2(1, 1)//(1,1)を足して-1～1を0～2にする
@@ -145,28 +136,23 @@ float4 PS(Output input):SV_TARGET {
 	float4 sphCol = sph.Sample(smp, spUV);
 	float4 spaCol = spa.Sample(smp, spUV);
 	
-	//float4 ret= spaCol + sphCol * texCol*toonCol*diffuse + float4(ambient*0.6, 1)
 	float4 ret = float4((spaCol + sphCol * texCol * toonCol*diffuse).rgb,diffuse.a)
 		+ float4(specular*specB, 1);
+	
 	
 
 	float shadowWeight = 1.0f;
 	float3 posFromLightVP=input.tpos.xyz / input.tpos.w;
-	float2 shadowUV = (input.tpos.xy/input.tpos.w+float2(1,-1))*float2(0.5,-0.5);
-	float depthFromLight = lightDepthTex.SampleCmpLevelZero(
-		shadowSmp, 
-		shadowUV, 
-		posFromLightVP.z-0.005f);
-	shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
-	//float depthFromLight = lightDepthTex.Sample(smp,shadowUV);
-	//if (depthFromLight < posFromLightVP.z - 0.005f) {
-	//	shadowWeight = 0.5f;
-	//}
-
-
-	//float rim = pow(1 - dot(input.normal, -eyeray),2);
-	//return float4(ret.rgb+float3(rim,rim*0.2,rim*0.2),ret.a);
-	//return float4(pow(ret.rgb,2.2), ret.a);
+	float2 shadowUV = (posFromLightVP +float2(1,-1))*float2(0.5,-0.5);
+	//float depthFromLight = lightDepthTex.SampleCmpLevelZero(
+	//	shadowSmp, 
+	//	shadowUV, 
+	//	posFromLightVP.z-0.005f);
+	//shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
+	float depthFromLight = lightDepthTex.Sample(smp,shadowUV);
+	if (depthFromLight < posFromLightVP.z - 0.005f) {
+		shadowWeight = 0.5f;
+	}
 	return float4(ret.rgb*shadowWeight,ret.a);
 }
 
@@ -181,7 +167,6 @@ shadowVS(float4 pos:POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min1
 	return  mul(lightCamera, pos);
 }
 
-float4
-shadowPS(float4 pos:SV_POSITION):SV_TARGET {
-	return float4(1,1,1,1);
+void
+shadowPS(float4 pos:SV_POSITION) {
 }
