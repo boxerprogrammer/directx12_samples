@@ -100,32 +100,29 @@ namespace {
 ///@param lookat 向かせたい方向ベクトル
 ///@param up 上ベクトル
 ///@param right 右ベクトル
-	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
-		//向かせたい方向(z軸)
-		XMVECTOR vz = XMVector3Normalize(lookat);
-
-		//(向かせたい方向を向かせたときの)仮のy軸ベクトル
-		XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
-
-		//(向かせたい方向を向かせたときの)y軸
-		XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vy, vz));
+XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+	//向かせたい方向(z軸)
+	XMVECTOR vz = XMVector3Normalize(lookat);
+	//(向かせたい方向を向かせたときの)仮のy軸ベクトル
+	XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
+	//(向かせたい方向を向かせたときの)y軸
+	XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vy, vz));
+	vy = XMVector3Normalize(XMVector3Cross(vz, vx));
+	///LookAtとupが同じ方向を向いてたらright基準で作り直す
+	if (abs(XMVector3Dot(vy, vz).m128_f32[0]) == 1.0f) {
+		//仮のX方向を定義
+		vx = XMVector3Normalize(XMLoadFloat3(&right));
+		//向かせたい方向を向かせたときのY軸を計算
 		vy = XMVector3Normalize(XMVector3Cross(vz, vx));
-
-		///LookAtとupが同じ方向を向いてたらright基準で作り直す
-		if (abs(XMVector3Dot(vy, vz).m128_f32[0]) == 1.0f) {
-			//仮のX方向を定義
-			vx = XMVector3Normalize(XMLoadFloat3(&right));
-			//向かせたい方向を向かせたときのY軸を計算
-			vy = XMVector3Normalize(XMVector3Cross(vz, vx));
-			//真のX軸を計算
-			vx = XMVector3Normalize(XMVector3Cross(vy, vz));
-		}
-		XMMATRIX ret = XMMatrixIdentity();
-		ret.r[0] = vx;
-		ret.r[1] = vy;
-		ret.r[2] = vz;
-		return ret;
+		//真のX軸を計算
+		vx = XMVector3Normalize(XMVector3Cross(vy, vz));
 	}
+	XMMATRIX ret = XMMatrixIdentity();
+	ret.r[0] = vx;
+	ret.r[1] = vy;
+	ret.r[2] = vz;
+	return ret;
+}
 
 	///特定のベクトルを特定の方向に向けるための行列を返す
 	///@param origin 特定のベクトル

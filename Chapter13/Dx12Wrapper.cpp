@@ -863,7 +863,7 @@ Dx12Wrapper::CreateBokehParamResource() {
 
 bool 
 Dx12Wrapper::CreateEffectBufferAndView() {
-	if (!LoadPictureFromFile(L"normal/WireReinforced_N.jpg", _distortionTexBuffer)) {
+	if (!LoadPictureFromFile(L"normal/normalmap.jpg", _distortionTexBuffer)) {
 		return false;
 	}
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};

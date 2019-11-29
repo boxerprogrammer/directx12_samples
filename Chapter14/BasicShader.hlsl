@@ -38,7 +38,7 @@ struct Output {
 	float4 pos : POSITION;
 	float4 normal : NORMAL;
 	float2 uv : TEXCOORD;
-	uint instNo:NO;
+	uint instNo:SV_InstanceID;
 };
 
 //頂点シェーダ(頂点情報から必要なものを次の人へ渡す)

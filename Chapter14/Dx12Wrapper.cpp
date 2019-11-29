@@ -403,7 +403,7 @@ Dx12Wrapper::CreateDepthBuffer() {
 	D3D12_HEAP_PROPERTIES heapprop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	auto wsize = Application::Instance().GetWindowSize();
-	D3D12_RESOURCE_DESC resdesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, wsize.width, wsize.height);
+	D3D12_RESOURCE_DESC resdesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32_TYPELESS, wsize.width, wsize.height);
 	resdesc.Flags= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 	D3D12_CLEAR_VALUE cv = {};
@@ -868,7 +868,7 @@ Dx12Wrapper::CreateBokehParamResource() {
 
 bool 
 Dx12Wrapper::CreateEffectBufferAndView() {
-	if (!LoadPictureFromFile(L"normal/WireReinforced_N.jpg", _distortionTexBuffer)) {
+	if (!LoadPictureFromFile(L"normal/normalmap.jpg", _distortionTexBuffer)) {
 		return false;
 	}
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
