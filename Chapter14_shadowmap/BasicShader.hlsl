@@ -105,7 +105,6 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 
 //ピクセルシェーダ
 float4 PS(Output input):SV_TARGET {
-	return float4(input.tpos.w, input.tpos.w, input.tpos.w, 1);
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);
@@ -144,15 +143,15 @@ float4 PS(Output input):SV_TARGET {
 	float shadowWeight = 1.0f;
 	float3 posFromLightVP=input.tpos.xyz / input.tpos.w;
 	float2 shadowUV = (posFromLightVP +float2(1,-1))*float2(0.5,-0.5);
-	//float depthFromLight = lightDepthTex.SampleCmpLevelZero(
-	//	shadowSmp, 
-	//	shadowUV, 
-	//	posFromLightVP.z-0.005f);
-	//shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
-	float depthFromLight = lightDepthTex.Sample(smp,shadowUV);
-	if (depthFromLight < posFromLightVP.z - 0.005f) {
-		shadowWeight = 0.5f;
-	}
+	float depthFromLight = lightDepthTex.SampleCmp(
+		shadowSmp, 
+		shadowUV, 
+		posFromLightVP.z-0.005f);
+	shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
+	//float depthFromLight = lightDepthTex.Sample(smp,shadowUV);
+	//if (depthFromLight < posFromLightVP.z -0.001f) {
+	//	shadowWeight = 0.5f;
+	//}
 	return float4(ret.rgb*shadowWeight,ret.a);
 }
 

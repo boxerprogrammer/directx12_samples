@@ -167,15 +167,15 @@ PMDRenderer::CreateRootSignature() {
 	sampler[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 	sampler[1].ShaderRegister = 1;
 
-	sampler[2] = sampler[0];
+	sampler[2] = sampler[0];//殆ど同じなので通常のサンプラの情報をコピー
 	sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
-	sampler[2].MinLOD = -D3D12_FLOAT32_MAX;
+	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;//<=であればtrue(1.0)そうでなければ(0.0)
+	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;//比較結果をバイリニア補間
+	sampler[2].MaxAnisotropy = 1;//深度傾斜を有効に
 	sampler[2].ShaderRegister = 2;
-	sampler[2].MaxAnisotropy = 1;
+	
 
 
 	rsDesc.NumStaticSamplers = 3;

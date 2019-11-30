@@ -1417,7 +1417,7 @@ Dx12Wrapper::CreateGradationTexture() {
 
 bool 
 Dx12Wrapper::CreateDistortion() {
-	if (!LoadPictureFromFile(L"normal/Cracked_N.jpg", _distBuff)) {
+	if (!LoadPictureFromFile(L"normal/normalmap.jpg", _distBuff)) {
 		return false;
 	}
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};

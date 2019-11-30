@@ -76,24 +76,32 @@ Application::Initialize() {
 	}
 	_pmdRenderer->Init();
 	_actor.reset(new PMDActor(_dx12,"Model/初音ミクmetal.pmd"));
+	_actor->LoadVMDData("motion/yagokoro.vmd");
 	_actor->Move(-10, 0, 10);
-	
 	_pmdRenderer->AddActor(_actor);
-	_pmdRenderer->AddActor("Model/初音ミク.pmd");
+
+	auto miku=make_shared<PMDActor>(_dx12, "Model/初音ミク.pmd");
+	miku->LoadVMDData("motion/yagokoro.vmd");
+	miku->Move(0, 0, 0);
+	_pmdRenderer->AddActor(miku);
 
 	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
+	kaito->LoadVMDData("motion/yagokoro.vmd");
 	kaito->Move(-5, 0, 5);
 	_pmdRenderer->AddActor(kaito);
 
 	auto ruka = make_shared<PMDActor>(_dx12, "Model/巡音ルカ.pmd");
+	ruka->LoadVMDData("motion/yagokoro.vmd");
 	ruka->Move(10, 0, 10);
 	_pmdRenderer->AddActor(ruka);
 
 	auto meiko = make_shared<PMDActor>(_dx12, "Model/咲音メイコ.pmd");
+	meiko->LoadVMDData("motion/yagokoro.vmd");
 	meiko->Move(-10, 0, 0);
 	_pmdRenderer->AddActor(meiko);
 	
 	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
+	rin->LoadVMDData("motion/yagokoro.vmd");
 	rin->Move(10, 0, 0);
 	_pmdRenderer->AddActor(rin);
 
