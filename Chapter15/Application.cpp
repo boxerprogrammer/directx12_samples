@@ -183,7 +183,7 @@ Application::Run() {
 		_dx12->PreDrawShadow();
 		_pmdRenderer->DrawFromLight();
 
-
+		
 
 		//１枚目(ペラポリへ)
 		_dx12->PreDrawToPera1();
@@ -191,6 +191,9 @@ Application::Run() {
 		_pmdRenderer->BeforeDraw();
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
+
+		//ブルーム用
+		_dx12->DrawShrinkTextureForBlur();
 
 		//2枚目(ペラポリ1→ペラポリ2へ)
 		//_dx12->DrawToPera2();

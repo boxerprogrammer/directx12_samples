@@ -48,6 +48,12 @@ struct Output {
 	float instNo : INSTNO;
 };
 
+struct PixelOutput {
+	float4 col:SV_TARGET0;//通常のレンダリング結果
+	float4 normal:SV_TARGET1;//法線
+	float4 highLum:SV_TARGET2;//高輝度(High Luminance)
+};
+
 struct PrimitiveOutput {
 	float4 svpos:SV_POSITION;
 	float4 tpos : TPOS;
@@ -104,7 +110,9 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 
 
 //ピクセルシェーダ
-float4 PS(Output input):SV_TARGET {
+PixelOutput PS(Output input) {
+
+
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);
@@ -121,19 +129,26 @@ float4 PS(Output input):SV_TARGET {
 		specB=pow(p, power);
 	}
 
-	//ディフューズ明るさ		
-	float diffB = dot(-light, input.normal);
-	float4 toonCol = toon.Sample(clutSmp, float2(0, 1 - diffB));
-	
 
-	float4 texCol =  tex.Sample(smp, input.uv);
-	
-	float2 spUV= (input.normal.xy
+	float4 texCol = tex.Sample(smp, input.uv);
+	float2 spUV = (input.normal.xy
 		*float2(1, -1) //まず上下だけひっくりかえす
 		+ float2(1, 1)//(1,1)を足して-1～1を0～2にする
 		) / 2;
 	float4 sphCol = sph.Sample(smp, spUV);
 	float4 spaCol = spa.Sample(smp, spUV);
+
+	//↓ディファードシェーディング実験用コード↓
+	//PixelOutput output;
+	//output.col = float4(spaCol+sphCol*texCol*diffuse);
+	//output.normal.rgb = float3((input.normal.xyz + 1.0f) / 2.0f);
+	//output.normal.a = 1;
+	//return output;
+
+	//ディフューズ明るさ		
+	float diffB = dot(-light, input.normal);
+	float4 toonCol = toon.Sample(clutSmp, float2(0, 1 - diffB));
+
 	
 	float4 ret = float4((spaCol + sphCol * texCol * toonCol*diffuse).rgb,diffuse.a)
 		+ float4(specular*specB, 1);
@@ -148,11 +163,15 @@ float4 PS(Output input):SV_TARGET {
 		shadowUV, 
 		posFromLightVP.z-0.005f);
 	shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
-	//float depthFromLight = lightDepthTex.Sample(smp,shadowUV);
-	//if (depthFromLight < posFromLightVP.z -0.001f) {
-	//	shadowWeight = 0.5f;
-	//}
-	return float4(ret.rgb*shadowWeight,ret.a);
+	
+	PixelOutput output;
+	output.col = float4(ret.rgb*shadowWeight, ret.a);
+	output.normal.rgb = float3((input.normal.xyz + 1.0f) / 2.0f);
+	output.normal.a = 1;
+	float y = dot(float3(0.299f, 0.587f, 0.114f), output.col);
+	output.highLum = y>0.995f? output.col :0.0;
+	output.highLum.a = 1.0f;
+	return output;
 }
 
 //影用頂点座標変換

@@ -23,7 +23,7 @@
     <ProjectGuid>{08773AF7-498E-456C-8FE6-C007D2B19D12}</ProjectGuid>
     <RootNamespace>Dx12BookSamples</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
-    <ProjectName>Chapter9</ProjectName>
+    <ProjectName>Chapter09</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

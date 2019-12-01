@@ -3,23 +3,23 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.329
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter4", "Chapter4\Chapter4.vcxproj", "{8482CF1B-AC98-4420-983C-89A9B0293ED5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter04", "Chapter4\Chapter4.vcxproj", "{8482CF1B-AC98-4420-983C-89A9B0293ED5}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter5", "Chapter5\Chapter5.vcxproj", "{CEDFBC56-E445-48EA-9B1D-36025EF8615D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter05", "Chapter5\Chapter5.vcxproj", "{CEDFBC56-E445-48EA-9B1D-36025EF8615D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter6", "Chapter6\Chapter6.vcxproj", "{743F92F7-08B9-49E9-BA6C-D3104A2C9C83}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter06", "Chapter6\Chapter6.vcxproj", "{743F92F7-08B9-49E9-BA6C-D3104A2C9C83}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter6_CopyTexture", "Chapter6_CopyTexture\Chapter6_copytex.vcxproj", "{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter06_CopyTexture", "Chapter6_CopyTexture\Chapter6_copytex.vcxproj", "{D0890DF4-D1D5-437B-AF1F-E0D7726A177A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter7", "Chapter7\Chapter7.vcxproj", "{F20F8C25-F105-442B-8A00-8C0EEEBB9376}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter07", "Chapter7\Chapter7.vcxproj", "{F20F8C25-F105-442B-8A00-8C0EEEBB9376}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter8", "Chapter8\Chapter8.vcxproj", "{4AB0575D-283E-40E3-AF2A-7514BC9D3834}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter08", "Chapter8\Chapter8.vcxproj", "{4AB0575D-283E-40E3-AF2A-7514BC9D3834}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter9", "Chapter9\Chapter9.vcxproj", "{08773AF7-498E-456C-8FE6-C007D2B19D12}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter09", "Chapter9\Chapter9.vcxproj", "{08773AF7-498E-456C-8FE6-C007D2B19D12}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter9_Refactored", "Chapter9_Refactored\Chapter9_Refactored.vcxproj", "{10DA7259-D698-41FB-86FC-0B920EC7606B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter09_Refactored", "Chapter9_Refactored\Chapter9_Refactored.vcxproj", "{10DA7259-D698-41FB-86FC-0B920EC7606B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter9_Refactored2", "Chapter9_Refactored2\Chapter9_Refactored2.vcxproj", "{C030E26B-7C82-4D22-811E-BCBA1CD700FF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter09_Refactored2", "Chapter9_Refactored2\Chapter9_Refactored2.vcxproj", "{C030E26B-7C82-4D22-811E-BCBA1CD700FF}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter11", "Chapter11\Chapter11.vcxproj", "{4ECBFEC5-9064-4AE4-A626-24C3EA3A75B0}"
 EndProject
@@ -30,6 +30,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter14", "Chapter14\Chapter14.vcxproj", "{D43F4D59-D0E4-449A-86CF-5574C91FE6CC}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter14_shadowmap", "Chapter14_shadowmap\Chapter14_shadowmap.vcxproj", "{D8629968-0CBA-4ADD-9629-1A56C363C9AD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chapter15", "Chapter15\Chapter15.vcxproj", "{488295C5-37BD-46E6-A94C-109851C7F011}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -151,6 +153,14 @@ Global
 		{D8629968-0CBA-4ADD-9629-1A56C363C9AD}.Release|x64.Build.0 = Release|x64
 		{D8629968-0CBA-4ADD-9629-1A56C363C9AD}.Release|x86.ActiveCfg = Release|Win32
 		{D8629968-0CBA-4ADD-9629-1A56C363C9AD}.Release|x86.Build.0 = Release|Win32
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Debug|x64.ActiveCfg = Debug|x64
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Debug|x64.Build.0 = Debug|x64
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Debug|x86.ActiveCfg = Debug|Win32
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Debug|x86.Build.0 = Debug|Win32
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Release|x64.ActiveCfg = Release|x64
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Release|x64.Build.0 = Release|x64
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Release|x86.ActiveCfg = Release|Win32
+		{488295C5-37BD-46E6-A94C-109851C7F011}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

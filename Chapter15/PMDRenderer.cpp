@@ -172,7 +172,7 @@ PMDRenderer::CreateRootSignature() {
 	sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;//<=であればtrue(1.0)そうでなければ(0.0)
-	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;//比較結果をバイリニア補間
+	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;//比較結果をバイリニア補間
 	sampler[2].MaxAnisotropy = 1;//深度傾斜を有効に
 	sampler[2].ShaderRegister = 2;
 	
@@ -259,10 +259,11 @@ PMDRenderer::CreatePipeline() {
 
 
 	//出力
-	plsDesc.NumRenderTargets = 1;//レンダーターゲット数
-	//↑で指定したレンダーターゲット数は「必ず」設定しなければ
-	//ならない↓
+	plsDesc.NumRenderTargets = 3;//レンダーターゲット数
 	plsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	plsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	plsDesc.RTVFormats[2] = DXGI_FORMAT_R8G8B8A8_UNORM;
+
 
 	plsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	plsDesc.BlendState.RenderTarget[0].BlendEnable = true;//今のところfalse

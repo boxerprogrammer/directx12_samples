@@ -8,6 +8,7 @@
 #include<wrl.h>
 #include<unordered_map>
 #include<memory>
+#include<array>
 
 class PMDActor;
 class PMDRenderer;
@@ -115,7 +116,7 @@ private:
 	//メモリリソースとそのビュー
 	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
 	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
-	ComPtr<ID3D12Resource> _peraResource;
+	std::array<ComPtr<ID3D12Resource>,2> _pera1Resources;
 	//１枚目ペラポリのためのリソースとビューを
 	//作成
 	bool CreatePera1ResourceAndView();
@@ -132,8 +133,8 @@ private:
 	//なお、頂点バッファおよびルートシグネチャ
 	//およびでスクリプタヒープは１枚目と共用するので
 	//リソースとパイプラインだけでOK
-	ComPtr<ID3D12Resource> _peraResource2;
-	ComPtr<ID3D12PipelineState> _peraPipeline2;
+	ComPtr<ID3D12Resource> _peraResourceForVerticalBlur;
+	ComPtr<ID3D12PipelineState> _peraPipelineVerticalBlur;
 	// ペラポリ２枚目用
 	bool CreatePera2Resource();
 	
@@ -166,6 +167,12 @@ private:
 	bool CreatePrimitivePipeline();
 	bool CreatePrimitiveRootSignature();
 	
+	ComPtr<ID3D12PipelineState> _blurPipeline;//画面全体ぼかし用パイプライン
+	std::array<ComPtr<ID3D12Resource>, 2> _bloomBuffers;//ブルーム用バッファ
+	ComPtr<ID3D12Resource> _dofBuffer;//被写界深度用ぼかしバッファ
+	bool CreateBloomBuffer();
+	bool CreateBlurForDOFBuffer();
+
 public:
 	Dx12Wrapper(HWND hwnd);
 	~Dx12Wrapper();
@@ -204,6 +211,7 @@ public:
 	void DrawPrimitiveShapes();
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
 	void DrawToPera2();
+	void DrawShrinkTextureForBlur();
 	//画面のクリア
 	bool Clear();
 
