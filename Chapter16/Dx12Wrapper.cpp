@@ -29,6 +29,15 @@ namespace {
 
 constexpr uint32_t shadow_difinition = 1024;
 
+void
+Dx12Wrapper::DrawAmbientOcculusion() {
+
+}
+bool 
+Dx12Wrapper::CreateAmbientOcclusionBuffer() {
+
+}
+
 bool
 Dx12Wrapper::CreateConstantBufferForPera() {
 	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
