@@ -173,6 +173,12 @@ private:
 	bool CreateBloomBuffer();
 	bool CreateBlurForDOFBuffer();
 
+
+	ComPtr<ID3D12Resource> _aoBuffer;
+	ComPtr<ID3D12PipelineState> _aoPipeline;
+	bool CreateAmbientOcclusionBuffer();
+	void DrawAmbientOcculusion();
+
 public:
 	Dx12Wrapper(HWND hwnd);
 	~Dx12Wrapper();

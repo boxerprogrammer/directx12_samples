@@ -20,10 +20,17 @@ cbuffer Weights : register(b0) {
 };
 
 
+
 struct Output {
 	float4 pos: SV_POSITION;
 	float2 uv:TEXCOORD;
 };
+
+//Œ»İ‚ÌUV’l‚ğŒ³‚É—”‚ğ•Ô‚·
+float random(float2 uv) {
+	return frac(sin(dot(uv, float2(12.9898, 78.233)))*43758.5453);
+}
+
 
 float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,float dx,float dy,float4 rect){
 	float4 ret = tex.Sample(smp, uv);
