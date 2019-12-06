@@ -22,9 +22,11 @@ Texture2D<float> lightDepthTex : register(t4);
 cbuffer sceneBuffer : register(b1) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
+	matrix invproj;//プロジェクション
 	matrix lightCamera;//ライトビュープロジェ
 	matrix shadow;//影行列
 	float3 eye;//視点
+	
 };
 
 //アクター座標変換用スロット
@@ -104,7 +106,7 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 //	output.tpos.w = 1;
 	output.uv = uv;
 	normal.w = 0;
-	output.normal = mul(world,normal);
+	output.normal = mul(world,mul(conBone,normal));
 	return output;
 }
 
@@ -153,7 +155,7 @@ PixelOutput PS(Output input) {
 		shadowSmp, 
 		shadowUV, 
 		posFromLightVP.z-0.005f);
-	shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
+	//shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
 	
 	PixelOutput output;
 	output.col = float4(ret.rgb*shadowWeight, ret.a);

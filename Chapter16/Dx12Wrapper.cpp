@@ -55,20 +55,25 @@ Dx12Wrapper::CreateAmbientOcclusionBuffer() {
 }
 
 bool Dx12Wrapper::CreateAmbientOcclusionDescriptorHeap() {
+
+	//RTV用ヒープ作成
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	desc.NodeMask = 0;
 	desc.NumDescriptors = 1;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+
 	auto result = _dev->CreateDescriptorHeap(&desc, IID_PPV_ARGS(_aoRTVDH.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
 		return false;
 	}
+	//RTV作成
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	rtvDesc.Format = DXGI_FORMAT_R32_FLOAT;
 	_dev->CreateRenderTargetView(_aoBuffer.Get(), &rtvDesc, _aoRTVDH->GetCPUDescriptorHandleForHeapStart());
 
+	//SRV用ヒープ作成
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	desc.NodeMask = 0;
 	desc.NumDescriptors = 1;
@@ -77,13 +82,14 @@ bool Dx12Wrapper::CreateAmbientOcclusionDescriptorHeap() {
 	if (!CheckResult(result)) {
 		return false;
 	}
+
+	//SRV作成
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	_dev->CreateShaderResourceView(_aoBuffer.Get(), &srvDesc, _aoSRVDH->GetCPUDescriptorHandleForHeapStart());
-
 
 	return true;
 }
@@ -748,33 +754,43 @@ Dx12Wrapper::DrawToPera1(shared_ptr<PMDRenderer> renderer) {
 
 bool 
 Dx12Wrapper::CreatePeraPipeline() {
-	D3D12_DESCRIPTOR_RANGE range[5] = {};
+	D3D12_DESCRIPTOR_RANGE range[6] = {};
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[0].BaseShaderRegister = 0;//0
 	range[0].NumDescriptors = 1;
+	range[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//通常カラー、法線、高輝度、縮小高輝度、縮小通常、AO(5枚)
 	range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[1].BaseShaderRegister = 0;//0～5
 	range[1].NumDescriptors = 5;//t0,t1,t2,t3,t4
+	range[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
 	//歪みテクスチャ用
 	range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[2].BaseShaderRegister = 5;//
 	range[2].NumDescriptors = 1;//t5
+	range[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//深度値テクスチャ用
 	range[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[3].BaseShaderRegister = 6;//6～7
 	range[3].NumDescriptors = 2;//t6,t7
+	range[4].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//SSAOテクスチャ用
 	range[4].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//t
 	range[4].BaseShaderRegister = 8;//
 	range[4].NumDescriptors = 1;//t8
+	range[4].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	//シーン行列等
+	range[5].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
+	range[5].BaseShaderRegister = 1;//
+	range[5].NumDescriptors = 1;//b1
+	range[5].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rp[5] = {};
+	D3D12_ROOT_PARAMETER rp[6] = {};
 	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rp[0].DescriptorTable.pDescriptorRanges = &range[0];
@@ -800,8 +816,16 @@ Dx12Wrapper::CreatePeraPipeline() {
 	rp[4].DescriptorTable.pDescriptorRanges = &range[4];
 	rp[4].DescriptorTable.NumDescriptorRanges = 1;
 
+
+	rp[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rp[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rp[5].DescriptorTable.pDescriptorRanges = &range[5];
+	rp[5].DescriptorTable.NumDescriptorRanges = 1;
+
+
+
 	D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
-	rsDesc.NumParameters = 5;
+	rsDesc.NumParameters = 6;
 	rsDesc.pParameters = rp;
 	D3D12_STATIC_SAMPLER_DESC sampler = CD3DX12_STATIC_SAMPLER_DESC(0);
 	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -891,6 +915,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 	gpsDesc.NumRenderTargets = 1;
 	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R32_FLOAT;
 	gpsDesc.RTVFormats[1] = DXGI_FORMAT_UNKNOWN;
+	gpsDesc.BlendState.RenderTarget[0].BlendEnable = false;
 	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
 	result = _dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(_aoPipeline.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
@@ -1006,8 +1031,7 @@ Dx12Wrapper::DrawAmbientOcculusion() {
 	_cmdList->RSSetScissorRects(1, &rc);//シザー(切り抜き)矩形
 
 	_cmdList->SetDescriptorHeaps(1, _peraSRVHeap.GetAddressOf());
-	auto srvHandle = _peraSRVHeap->GetGPUDescriptorHandleForHeapStart();//法線テクスチャ
-	srvHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	auto srvHandle = _peraSRVHeap->GetGPUDescriptorHandleForHeapStart();//法線テクスチャのため
 	_cmdList->SetGraphicsRootDescriptorTable(1, srvHandle);
 
 	_cmdList->SetDescriptorHeaps(1, _depthSRVHeap.GetAddressOf());
@@ -1080,6 +1104,8 @@ void Dx12Wrapper::SetCameraSetting()
 		static_cast<float>(wsize.width) / static_cast<float>(wsize.height),
 		1.0f,
 		100.0f);
+	XMVECTOR det;
+	_mappedScene->invproj = XMMatrixInverse(&det,_mappedScene->proj);
 	auto plane = XMFLOAT4(0, 1, 0, 0);//平面
 	XMVECTOR planeVec = XMLoadFloat4(&plane);
 	auto light = XMFLOAT4(-1, 1, -1, 0);

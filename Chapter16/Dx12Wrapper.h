@@ -90,6 +90,7 @@ private:
 	struct SceneMatrix {
 		DirectX::XMMATRIX view;//ビュー
 		DirectX::XMMATRIX proj;//プロジェクション
+		DirectX::XMMATRIX invproj;//プロジェクション
 		DirectX::XMMATRIX lightCamera;//ライトから見たビュー
 		DirectX::XMMATRIX shadow;//影行列
 		DirectX::XMFLOAT3 eye;//視点

@@ -104,7 +104,7 @@ Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2
 //	output.tpos.w = 1;
 	output.uv = uv;
 	normal.w = 0;
-	output.normal = mul(world,normal);
+	output.normal = mul(world,mul(conBone,normal));
 	return output;
 }
 

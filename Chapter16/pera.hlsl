@@ -29,10 +29,6 @@ struct Output {
 	float2 uv:TEXCOORD;
 };
 
-//Œ»İ‚ÌUV’l‚ğŒ³‚É—”‚ğ•Ô‚·
-float random(float2 uv) {
-	return frac(sin(dot(uv, float2(12.9898, 78.233)))*43758.5453);
-}
 
 
 float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,float dx,float dy,float4 rect){
@@ -109,7 +105,8 @@ float4 PS(Output input) : SV_TARGET{
 		return float4(s,s,s,1);
 	}
 
-	return tex.Sample(smp, input.uv);
+	float4 col=tex.Sample(smp, input.uv);
+	return float4(col.rgb*texSSAO.Sample(smp, input.uv),col.a);
 }
 
 float4 VerticalBlurPS(Output input) : SV_TARGET{
