@@ -78,5 +78,6 @@
   <ItemGroup>
     <FxCompile Include="BasicShader.hlsl" />
     <FxCompile Include="pera.hlsl" />
+    <FxCompile Include="ssao.hlsl" />
   </ItemGroup>
 </Project>

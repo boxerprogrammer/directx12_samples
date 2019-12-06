@@ -129,14 +129,6 @@ private:
 	ComPtr<ID3D12PipelineState> _peraPipeline;
 	ComPtr<ID3D12RootSignature> _peraRS;
 
-	//２枚目ペラ用
-	//なお、頂点バッファおよびルートシグネチャ
-	//およびでスクリプタヒープは１枚目と共用するので
-	//リソースとパイプラインだけでOK
-	ComPtr<ID3D12Resource> _peraResourceForVerticalBlur;
-	ComPtr<ID3D12PipelineState> _peraPipelineVerticalBlur;
-	// ペラポリ２枚目用
-	bool CreatePera2Resource();
 	
 
 
@@ -210,7 +202,7 @@ public:
 	///プリミティブ形状(平面、円柱、円錐、球)を描画
 	void DrawPrimitiveShapes();
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
-	void DrawToPera2();
+
 	void DrawShrinkTextureForBlur();
 	//画面のクリア
 	bool Clear();

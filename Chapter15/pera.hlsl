@@ -203,7 +203,7 @@ BlurOutput BlurPS(Output input)
 	float dx = 1.0 / w;
 	float dy = 1.0 / h;
 	BlurOutput ret;
-	ret.col= Get5x5GaussianBlur(tex, smp, input.uv, dx, dy, float4(0, 0, 1, 1));
+	ret.col= tex.Sample(smp, input.uv);//Get5x5GaussianBlur(tex, smp, input.uv, dx, dy, float4(0, 0, 1, 1));
 	ret.highLum= Get5x5GaussianBlur(texHighLum, smp, input.uv, dx, dy, float4(0, 0, 1, 1));
 	return ret;
 }

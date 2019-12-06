@@ -192,8 +192,11 @@ Application::Run() {
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
 
-		//ブルーム用
-		_dx12->DrawShrinkTextureForBlur();
+
+		_dx12->DrawAmbientOcculusion();
+
+		////ブルーム用
+		//_dx12->DrawShrinkTextureForBlur();
 
 		//2枚目(ペラポリ1→ペラポリ2へ)
 		//_dx12->DrawToPera2();

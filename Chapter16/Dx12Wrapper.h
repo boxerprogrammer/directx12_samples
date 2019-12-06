@@ -129,17 +129,6 @@ private:
 	ComPtr<ID3D12PipelineState> _peraPipeline;
 	ComPtr<ID3D12RootSignature> _peraRS;
 
-	//２枚目ペラ用
-	//なお、頂点バッファおよびルートシグネチャ
-	//およびでスクリプタヒープは１枚目と共用するので
-	//リソースとパイプラインだけでOK
-	ComPtr<ID3D12Resource> _peraResourceForVerticalBlur;
-	ComPtr<ID3D12PipelineState> _peraPipelineVerticalBlur;
-	// ペラポリ２枚目用
-	bool CreatePera2Resource();
-	
-
-
 	//ペラポリに投げる定数バッファ
 	ComPtr<ID3D12Resource> _peraCB;
 	ComPtr<ID3D12DescriptorHeap> _peraCBVHeap;
@@ -176,8 +165,11 @@ private:
 
 	ComPtr<ID3D12Resource> _aoBuffer;
 	ComPtr<ID3D12PipelineState> _aoPipeline;
+	ComPtr<ID3D12DescriptorHeap> _aoRTVDH;
+	ComPtr<ID3D12DescriptorHeap> _aoSRVDH;
+
 	bool CreateAmbientOcclusionBuffer();
-	void DrawAmbientOcculusion();
+	bool CreateAmbientOcclusionDescriptorHeap();
 
 public:
 	Dx12Wrapper(HWND hwnd);
@@ -218,6 +210,7 @@ public:
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
 	void DrawToPera2();
 	void DrawShrinkTextureForBlur();
+	void DrawAmbientOcculusion();
 	//画面のクリア
 	bool Clear();
 

@@ -258,10 +258,6 @@ Dx12Wrapper::Init() {
 		return false;
 	}
 
-	//ペラ２枚目用
-	if (!CreatePera2Resource()) {
-		return false;
-	}
 	if (!CreateBlurForDOFBuffer()) {
 		return false;
 	}
@@ -811,20 +807,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 	}
 
 
-	//縦方向ぼかし用
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "VerticalBlurPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
-	if (!CheckResult(result, errBlob.Get())) {
-		assert(0);
-		return false;
-	}
-	gpsDesc.NumRenderTargets = 1;
-	gpsDesc.RTVFormats[1] = DXGI_FORMAT_UNKNOWN;
-	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-	result = _dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(_peraPipelineVerticalBlur.ReleaseAndGetAddressOf()));
-	if (!CheckResult(result)) {
-		assert(0);
-		return false;
-	}
+
 	return true;
 }
 
@@ -859,8 +842,8 @@ Dx12Wrapper::DrawShrinkTextureForBlur() {
 	auto rtvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandles[2] = {};
 	//４つめ、5つめを使用
-	rtvHandles[0].InitOffsetted(rtvBaseHandle,rtvIncSize * 3);
-	rtvHandles[1].InitOffsetted(rtvBaseHandle, rtvIncSize * 4);
+	rtvHandles[0].InitOffsetted(rtvBaseHandle,rtvIncSize * 3);//t3
+	rtvHandles[1].InitOffsetted(rtvBaseHandle, rtvIncSize * 4);//t4
 	//レンダーターゲットセット
 	_cmdList->OMSetRenderTargets(2, rtvHandles, false, nullptr);
 
@@ -1814,7 +1797,7 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	auto heapDesc = _rtvDescHeap->GetDesc();
 	//レンダーターゲットビュー(RTV)を作る
 	//ただしその前にでスクリプタヒープが必要(1つ目RT3枚、2つめ2枚(ブルーム、被写界深度用)、3つ目RT1枚)
-	heapDesc.NumDescriptors = 6;
+	heapDesc.NumDescriptors = 5;
 	result = _dev->CreateDescriptorHeap(&heapDesc, 
 		IID_PPV_ARGS(_peraRTVHeap.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
@@ -1844,16 +1827,13 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	//5枚目(被写界深度用縮小バッファ用RT)
 	_dev->CreateRenderTargetView(_dofBuffer.Get(),
 		&rtvDesc, handle);
-	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	
 
 
-	//6枚目(縦方向ぼかし用)
-	_dev->CreateRenderTargetView(_peraResourceForVerticalBlur.Get(),
-		&rtvDesc, handle);
 
 	//シェーダリソースビュービューを作る
 	//ただしその前にでスクリプタヒープが必要
-	heapDesc.NumDescriptors = 6;//1～3（ペラ１用）、4縮小バッファ*2、5(縦ぼかし用)
+	heapDesc.NumDescriptors = 5;//1～3（ペラ１用）、4縮小バッファ*2、5(縦ぼかし用)
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	
@@ -1893,82 +1873,9 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	_dev->CreateShaderResourceView(_dofBuffer.Get(),
 		&srvDesc,
 		handle);
-	handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	//6
-	_dev->CreateShaderResourceView(_peraResourceForVerticalBlur.Get(),
-		&srvDesc,
-		handle);
-	return true;
-
-}
-
-
-// ペラポリ２枚目用
-bool 
-Dx12Wrapper::CreatePera2Resource()
-{
-	auto wsize=Application::Instance().GetWindowSize();
-	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM,
-		wsize.width,
-		wsize.height);
-	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-	D3D12_CLEAR_VALUE clearValue = {};
-	clearValue.Color[0] = clearValue.Color[1] = clearValue.Color[2] = 0.5f;
-	clearValue.Color[3]=1.0f;
-	clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	auto result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		&clearValue,
-		IID_PPV_ARGS(_peraResourceForVerticalBlur.ReleaseAndGetAddressOf()));
-	if (!CheckResult(result)) {
-		assert(0);
-		return false;
-	}
-
-
 
 	return true;
-}
-
-void 
-Dx12Wrapper::DrawToPera2() {
-	Barrier(_peraResourceForVerticalBlur.Get(),
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	auto rtvHeapPointer = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
-	rtvHeapPointer.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-	_cmdList->OMSetRenderTargets(1, &rtvHeapPointer, false, nullptr);
-
-	auto wsize = Application::Instance().GetWindowSize();
-
-	D3D12_VIEWPORT vp = CD3DX12_VIEWPORT(0.0f, 0.0f, wsize.width, wsize.height);
-	_cmdList->RSSetViewports(1, &vp);//ビューポート
-
-	CD3DX12_RECT rc(0, 0, wsize.width, wsize.height);
-	_cmdList->RSSetScissorRects(1, &rc);//シザー(切り抜き)矩形
-
-	_cmdList->SetGraphicsRootSignature(_peraRS.Get());
-	_cmdList->SetDescriptorHeaps(1, _peraSRVHeap.GetAddressOf());
-
-	auto handle=_peraSRVHeap->GetGPUDescriptorHandleForHeapStart();
-	_cmdList->SetGraphicsRootDescriptorTable(1, handle);
-
-	_cmdList->SetDescriptorHeaps(1, _peraCBVHeap.GetAddressOf());
-	_cmdList->SetGraphicsRootDescriptorTable(0, _peraCBVHeap->GetGPUDescriptorHandleForHeapStart());
-
-	_cmdList->SetPipelineState(_peraPipeline.Get());
-	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	_cmdList->IASetVertexBuffers(0, 1, &_peraVBV);
-	_cmdList->DrawInstanced(4, 1, 0, 0);
-
-	Barrier(_peraResourceForVerticalBlur.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 }
+
+
