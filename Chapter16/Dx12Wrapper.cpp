@@ -1003,6 +1003,7 @@ Dx12Wrapper::DrawShrinkTextureForBlur() {
 void
 Dx12Wrapper::DrawAmbientOcculusion() {
 	
+	
 	Barrier(_aoBuffer.Get(),
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
