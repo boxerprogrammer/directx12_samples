@@ -44,7 +44,7 @@ Dx12Wrapper::CreateAmbientOcclusionBuffer() {
 	result = _dev->CreateCommittedResource(&heapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 		&clearValue,
 		IID_PPV_ARGS(_aoBuffer.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
@@ -527,12 +527,6 @@ Dx12Wrapper::PreDrawToPera1() {
 
 bool
 Dx12Wrapper::Clear() {
-	//for (auto& res : _pera1Resources) {
-	//	Barrier(res.Get(),
-	//		D3D12_RESOURCE_STATE_RENDER_TARGET,
-	//		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	//}
-
 	//バックバッファのインデックスを取得する
 	auto bbIdx=_swapchain->GetCurrentBackBufferIndex();
 
@@ -568,14 +562,7 @@ Dx12Wrapper::Flip() {
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
 
-	_cmdList->Close();
-	ID3D12CommandList* cmds[] = { _cmdList.Get() };
-	_cmdQue->ExecuteCommandLists(1, cmds);
-	
-	WaitForCommandQueue();
-
-	_cmdAlloc->Reset();
-	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
+	ExecuteAccumulatedCommand();
 
 	//Present関数が、DxLibにおけるScreenFlipみたいなもんです。
 	//Presentの第一引数が「何回垂直同期を待つか」です。
@@ -583,6 +570,18 @@ Dx12Wrapper::Flip() {
 	//周期1/60だったんだけど、今はそんなのないので待たない
 	auto result = _swapchain->Present(0, 0);
 	assert(SUCCEEDED(result));
+}
+
+void Dx12Wrapper::ExecuteAccumulatedCommand()
+{
+	_cmdList->Close();
+	ID3D12CommandList* cmds[] = { _cmdList.Get() };
+	_cmdQue->ExecuteCommandLists(1, cmds);
+
+	WaitForCommandQueue();
+
+	_cmdAlloc->Reset();
+	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
 }
 
 void Dx12Wrapper::WaitForCommandQueue()
@@ -991,7 +990,7 @@ Dx12Wrapper::DrawShrinkTextureForBlur() {
 		vp.Height /= 2;
 		sr.bottom = sr.top + vp.Height;
 	}
-	//縮小バッファをシェーダリソースにに
+	//縮小バッファをシェーダリソースに
 	Barrier(_bloomBuffers[1].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -1006,15 +1005,15 @@ Dx12Wrapper::DrawAmbientOcculusion() {
 	
 	Barrier(_aoBuffer.Get(),
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
+		D3D12_RESOURCE_STATE_RENDER_TARGET);//SSAOをレンダーターゲットに遷移
 
 	Barrier(_pera1Resources[0].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);//通常の結果をテクスチャとして
 
 	Barrier(_pera1Resources[1].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);//法線をテクスチャとして
 
 	auto rtvBaseHandle = _aoRTVDH->GetCPUDescriptorHandleForHeapStart();
 	
@@ -1038,6 +1037,10 @@ Dx12Wrapper::DrawAmbientOcculusion() {
 	_cmdList->SetDescriptorHeaps(1, _depthSRVHeap.GetAddressOf());
 	auto srvDSVHandle = _depthSRVHeap->GetGPUDescriptorHandleForHeapStart();
 	_cmdList->SetGraphicsRootDescriptorTable(3, srvDSVHandle);
+
+	_cmdList->SetDescriptorHeaps(1, _sceneHeap.GetAddressOf());
+	auto sceneHandle = _sceneHeap->GetGPUDescriptorHandleForHeapStart();
+	_cmdList->SetGraphicsRootDescriptorTable(5, sceneHandle);
 
 	_cmdList->SetPipelineState(_aoPipeline.Get());
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -1106,7 +1109,7 @@ void Dx12Wrapper::SetCameraSetting()
 		1.0f,
 		100.0f);
 	XMVECTOR det;
-	_mappedScene->invproj = XMMatrixInverse(&det,_mappedScene->proj);
+	_mappedScene->invproj = XMMatrixInverse(&det, _mappedScene->view*_mappedScene->proj);
 	auto plane = XMFLOAT4(0, 1, 0, 0);//平面
 	XMVECTOR planeVec = XMLoadFloat4(&plane);
 	auto light = XMFLOAT4(-1, 1, -1, 0);

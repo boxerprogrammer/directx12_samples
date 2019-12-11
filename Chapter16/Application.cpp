@@ -183,6 +183,7 @@ Application::Run() {
 		_dx12->PreDrawShadow();
 		_pmdRenderer->DrawFromLight();
 
+		//_dx12->ExecuteAccumulatedCommand();
 		
 
 		//１枚目(ペラポリへ)
@@ -192,9 +193,11 @@ Application::Run() {
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
 
+		//_dx12->ExecuteAccumulatedCommand();
 
 		_dx12->DrawAmbientOcculusion();
 
+		//_dx12->ExecuteAccumulatedCommand();
 		////ブルーム用
 		_dx12->DrawShrinkTextureForBlur();
 

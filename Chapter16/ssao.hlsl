@@ -27,7 +27,7 @@ float random(float2 uv) {
 //SSAO(æZ—p‚Ì–¾“x‚Ì‚İî•ñ‚ğ•Ô‚¹‚ê‚Î‚æ‚¢)
 float SsaoPs(Output input) : SV_Target
 {
-	float dp = depthtex.Sample(smp, input.uv);//Œ»İ‚ÌUV‚Ì[“x
+	float dp = depthtex.Sample(smp, input.uv);//Œ»İ‚ÌUV‚Ì[“x‚ğæ‚Á‚Ä‚¨‚­
 
 	float w, h, miplevels;
 	depthtex.GetDimensions(0, w, h, miplevels);
@@ -37,7 +37,10 @@ float SsaoPs(Output input) : SV_Target
 	//SSAO
 	//Œ³‚ÌÀ•W‚ğ•œŒ³‚·‚é
 	float4 respos = mul(invproj, float4(input.uv*float2(2, -2) + float2(-1, 1), dp, 1));
+	
 	respos.xyz = respos.xyz / respos.w;
+
+
 	float div = 0.0f;
 	float ao = 0.0f;
 	float3 norm = normalize((normtex.Sample(smp, input.uv).xyz * 2) - 1);
@@ -49,15 +52,15 @@ float SsaoPs(Output input) : SV_Target
 			float rnd2 = random(float2(rnd1, i*dy)) * 2 - 1;
 			float rnd3 = random(float2(rnd2, rnd1)) * 2 - 1;
 			float3 omega = normalize(float3(rnd1,rnd2,rnd3));
-			omega = normalize(omega);
+			omega = normalize(norm+omega);
 			//—”‚ÌŒ‹‰Ê–@ü‚Ì”½‘Î‘¤‚ÉŒü‚¢‚Ä‚½‚ç”½“]‚·‚é
 			float dt = dot(norm, omega);
 			float sgn = sign(dt);
-			omega *= sign(dt);
+			omega *= sgn;//•„†‚ğæZ‚·‚é‚±‚Æ‚ÅA— Œü‚«‚È‚ç”½“]
 			//Œ‹‰Ê‚ÌÀ•W‚ğÄ‚ÑË‰e•ÏŠ·‚·‚é
-			float4 rpos = mul(proj, float4(respos.xyz + omega * radius, 1));
+			float4 rpos = mul(mul(proj,view), float4(respos.xyz + omega * radius, 1));
 			rpos.xyz /= rpos.w;
-			dt *= sgn;
+			dt *= sgn;//ƒvƒ‰ƒX‚É‚·‚é
 			div += dt;
 			//ŒvZŒ‹‰Ê‚ªŒ»İ‚ÌêŠ‚Ì[“x‚æ‚è‰œ‚É“ü‚Á‚Ä‚é‚È‚çÕ•Á‚³‚ê‚Ä‚¢‚é‚Æ‚¢‚¤–‚È‚Ì‚Å‰ÁZ
 			ao += step(depthtex.Sample(smp, (rpos.xy + float2(1, -1))*float2(0.5f, -0.5f)), rpos.z)*dt;
@@ -68,13 +71,13 @@ float SsaoPs(Output input) : SV_Target
 }
 
 
-//SSAO
+////SSAO
 //float SsaoPs(Output input) : SV_Target
 //{
 //	float dp = depthtex.Sample(smp, input.uv);//Œ»İ‚ÌUV‚Ì[“x
 //
-//	SSAO
-//	Œ³‚ÌÀ•W‚ğ•œŒ³‚·‚é
+//	//SSAO
+//	//Œ³‚ÌÀ•W‚ğ•œŒ³‚·‚é
 //	float4 respos = mul(invproj, float4(input.uv*float2(2, -2) + float2(-1, 1), dp, 1));
 //	respos.xyz = respos.xyz / respos.w;
 //	
