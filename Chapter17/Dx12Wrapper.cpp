@@ -349,6 +349,12 @@ Dx12Wrapper::Init() {
 		return false;
 	}
 
+	//‰Šú‰»Žž‚ÉŒÄ‚Ño‚·
+	_heapForImgui = CreateDescriptorHeapForImgui();
+	if (_heapForImgui == nullptr) {
+		return false;
+	}
+
 	return true;
 
 }
@@ -2052,4 +2058,22 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	_dev->CreateShaderResourceView(_aoBuffer.Get(),	&srvDesc,handle);
 	return true;
 
+}
+
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::CreateDescriptorHeapForImgui() {
+	ComPtr<ID3D12DescriptorHeap> ret;
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	desc.NodeMask = 0;
+	desc.NumDescriptors = 1;
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	_dev->CreateDescriptorHeap(&desc, IID_PPV_ARGS(ret.ReleaseAndGetAddressOf()));
+	return ret;
+}
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::GetHeapForImgui() {
+	return _heapForImgui;
 }

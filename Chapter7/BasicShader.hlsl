@@ -6,6 +6,13 @@ cbuffer cbuff0 : register(b0) {
 	matrix mat;//変換行列
 };
 
+struct Matrix{
+	matrix world;
+	matrix view;
+	matrix proj;
+};
+ConstantBuffer<Matrix> m: register(b1);
+
 //頂点シェーダ→ピクセルシェーダへのやり取りに使用する
 //構造体
 struct Output {

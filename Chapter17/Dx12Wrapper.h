@@ -172,6 +172,9 @@ private:
 	bool CreateAmbientOcclusionBuffer();
 	bool CreateAmbientOcclusionDescriptorHeap();
 
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForImgui();
+	ComPtr<ID3D12DescriptorHeap> _heapForImgui;
+
 public:
 	Dx12Wrapper(HWND hwnd);
 	~Dx12Wrapper();
@@ -231,6 +234,17 @@ public:
 	void MoveEyePosition(float x, float y, float z);
 
 	DirectX::XMVECTOR GetCameraPosition();
+
+	ComPtr<ID3D12DescriptorHeap> GetHeapForImgui();
+	void SetDebugDisplay(bool flg);//デバッグ表示のON / OFF
+	void SetSSAO(bool flg);//アンビエントオクルージョンのON / OFF
+	void SetSelfShadow(bool flg);//セルフシャドウON / OFF
+	void SetFieldOfView(float fov);//画角(30°～150°)
+	void SetLightVector(float vec[3]);//光線ベクトル(xyzベクトル)
+	void SetBackColor(float col[4]);//背景色の変更
+	void SetBloomColor(float col[3]);//ブルームの色付け
+
+	void SetDebugDisplay(bool flg);
 
 };
 

@@ -20,10 +20,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{2F11D269-F5FD-4906-B164-4F84442F54E8}</ProjectGuid>
-    <RootNamespace>Chapter16</RootNamespace>
+    <ProjectGuid>{B47CDF8C-6A0E-4472-A0DA-FB081BA9B536}</ProjectGuid>
+    <RootNamespace>Chapter17</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>Chapter16(AO)</ProjectName>
+    <ProjectName>Chapter17(imgui)</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -127,6 +127,12 @@
     <ClCompile Include="CylinderActor.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="Helper.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PlaneActor.cpp" />
     <ClCompile Include="PMDActor.cpp" />
@@ -139,6 +145,14 @@
     <ClInclude Include="CylinderActor.h" />
     <ClInclude Include="Dx12Wrapper.h" />
     <ClInclude Include="Helper.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="imgui\imgui_impl_win32.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="PlaneActor.h" />
     <ClInclude Include="PMDActor.h" />
     <ClInclude Include="PMDRenderer.h" />

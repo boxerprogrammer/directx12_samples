@@ -27,6 +27,11 @@ float random(float2 uv) {
 //SSAO(æZ—p‚Ì–¾“x‚Ì‚İî•ñ‚ğ•Ô‚¹‚ê‚Î‚æ‚¢)
 float SsaoPs(Output input) : SV_Target
 {
+	//matrix<float,2,3> mat;
+	//float2x3 mat2;
+	float4x4 mat;
+	mat._11_12_13_14 = float4(1.0f, 2.0f, 3.0f, 4.0f);
+
 	float dp = depthtex.Sample(smp, input.uv);//Œ»İ‚ÌUV‚Ì[“x
 
 	float w, h, miplevels;
