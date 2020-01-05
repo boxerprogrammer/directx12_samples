@@ -222,6 +222,7 @@ public:
 
 	//ƒtƒŠƒbƒv
 	void Flip();
+	void ExecuteAccumulatedCommand();
 	void WaitForCommandQueue();
 
 	bool LoadPictureFromFile(std::wstring filepath, ComPtr<ID3D12Resource>& buff);
