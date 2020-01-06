@@ -247,15 +247,26 @@ Application::Run() {
 		static bool blnShadowmap = false;
 		ImGui::Checkbox("Self Shadow on/off", &blnShadowmap);
 		constexpr float pi = 3.141592653589f;
-		static float fov =  pi/ 4.0f;
-		ImGui::SliderFloat("Field of view", &fov, pi/6.0f, pi*5.0f/6.0f);
+		if(ImGui::SliderFloat("Field of view", &fov, pi/6.0f, pi*5.0f/6.0f)){
+			_dx12->SetFov(fov);
+		}
 		static float lightVec[3] = { 1.0,-1.0,1.0f };
-		ImGui::SliderFloat3("Light vector", lightVec, -1.0f,1.0f);
-		static float bgCol[4] = {};
+		if (ImGui::SliderFloat3("Light vector", lightVec, -1.0f, 1.0f)) {
+			_dx12->SetLightVector(lightVec);
+		}
+		static float bgCol[4] = {0.5f,0.5f,0.5f,1.0f};
 		ImGui::ColorPicker4("BG color", bgCol, ImGuiColorEditFlags_::ImGuiColorEditFlags_PickerHueWheel |
 														ImGuiColorEditFlags_::ImGuiColorEditFlags_AlphaBar);
 		static float bloomCol[3] = {};
 		ImGui::ColorPicker3("Bloom color",bloomCol);
+
+		//Dx12Wrapper‚É‘Î‚µ‚ÄÝ’è‚ð“n‚·
+		_dx12->SetDebugDisplay(blnDebugDisp);
+		_dx12->SetSSAO(blnSSAO);
+		_dx12->SetSelfShadow(blnShadowmap);
+		
+		_dx12->SetBackColor(bgCol);
+		_dx12->SetBloomColor(bloomCol);
 		
 
 		ImGui::End();

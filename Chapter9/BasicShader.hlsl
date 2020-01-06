@@ -64,11 +64,11 @@ float4 BasicPS(Output input ) : SV_TARGET{
 
 	float4 texColor = tex.Sample(smp, input.uv); //テクスチャカラー
 
-	return saturate(toonDif//輝度(トゥーン)
+	return max(saturate(toonDif//輝度(トゥーン)
 		* diffuse//ディフューズ色
 		*texColor//テクスチャカラー
 		*sph.Sample(smp, sphereMapUV))//スフィアマップ(乗算)
 		+ saturate(spa.Sample(smp, sphereMapUV)*texColor//スフィアマップ(加算)
 		+ float4(specularB *specular.rgb, 1))//スペキュラー
-		+ float4(texColor*ambient*0.5,1);//アンビエント(明るくなりすぎるので0.5にしてます)
+		, float4(texColor*ambient,1));//アンビエント
 }

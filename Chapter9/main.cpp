@@ -1222,7 +1222,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 		//フリップ
-		_swapchain->Present(1, 0);
+		_swapchain->Present(0, 0);
 		_cmdAllocator->Reset();//キューをクリア
 		_cmdList->Reset(_cmdAllocator, _pipelinestate);//再びコマンドリストをためる準備
 
