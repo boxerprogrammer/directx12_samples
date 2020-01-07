@@ -105,7 +105,7 @@ Application::Initialize() {
 	ImGui::CreateContext();
 	ImGui_ImplWin32_Init(_hwnd);
 	ImGui_ImplDX12_Init(_dx12->Device(),
-		1,
+		3,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
 		heapImgui.Get(),
 		heapImgui->GetCPUDescriptorHandleForHeapStart(),
@@ -121,15 +121,14 @@ Application::Initialize() {
 		1, //レンダーターゲット数
 		false, //デプスありか？
 		false, //反対デプスありか？
-		10000);//パーティクルの数
+		10000);//最大パーティクルの数
 
 
-	_efkManager = Effekseer::Manager::Create(10000);
+	_efkManager = Effekseer::Manager::Create(10000);//最大インスタンス数
 
 
-	//「系」を左手系にしておく
+	//「系」を左手系にしておく(とにかくクライアント側の系に合わせる)
 	_efkManager->SetCoordinateSystem(Effekseer::CoordinateSystem::LH);
-
 
 	// 描画用インスタンスから描画機能を設定
 	_efkManager->SetSpriteRenderer(_efkRenderer->CreateSpriteRenderer());
@@ -148,31 +147,28 @@ Application::Initialize() {
 	_efkCmdList = EffekseerRendererDX12::CreateCommandList(_efkRenderer, _efkMemoryPool);
 	_efkRenderer->SetCommandList(_efkCmdList);
 
-	SyncronizeEffecseerCamera();
+	SyncronizeEffekseerCamera();
 
 	_pmdRenderer->Init();
 
 
 	// エフェクトの読込
-	_effect = Effekseer::Effect::Create(_efkManager, (const EFK_CHAR*)L"effect/suzuki.efk",1.0f, (const EFK_CHAR*)L"effect");
+	_effect = Effekseer::Effect::Create(_efkManager, (const EFK_CHAR*)L"effect/10/SimpleLaser.efk",1.0f, (const EFK_CHAR*)L"effect/10");
 
 	// エフェクトの再生
-	//_efkHandle = _efkManager->Play(_effect, 0, 0, 0);
+	_efkHandle = _efkManager->Play(_effect, 0, 0, 0);
 
 	
 
 
-	//_actor.reset(new PMDActor("Model/初音ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/飛鳥/飛鳥Ver1.10SW.pmd"));
-	//_actor.reset(new PMDActor("Model/satori/古明地さとり152Normal.pmd"));
-	_actor.reset(new PMDActor(_dx12, "Model/sakura/mikuXS桜ミク.pmd"));
-	//_actor.reset(new PMDActor("Model/巡音ルカ.pmd"));
+
+	_actor.reset(new PMDActor(_dx12, "Model/初音ミク.pmd"));
 	_actor->Move(-10, 0, 10);
 	
 	_pmdRenderer->AddActor(_actor);
 	_pmdRenderer->AddActor("Model/初音ミクmetal.pmd");
 
-	auto satori = make_shared<PMDActor>(_dx12, "Model/satori/古明地さとり152Normal.pmd");
+	auto satori = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
 	satori->Move(-5, 0, 5);
 	_pmdRenderer->AddActor(satori);
 
@@ -180,24 +176,19 @@ Application::Initialize() {
 	ruka->Move(10, 0, 10);
 	_pmdRenderer->AddActor(ruka);
 
-	//auto satori = make_shared<PMDActor>(_dx12, "Model/satori/古明地さとり152Normal.pmd");
-	//satori->Move(10, 0, 0);
-	//_pmdRenderer->AddActor(satori);
-
-	auto hibiki = make_shared<PMDActor>(_dx12, "Model/hibiki/我那覇響v1.pmd");
+	auto hibiki = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
 	hibiki->Move(-10, 0, 0);
 	_pmdRenderer->AddActor(hibiki);
 	
-	auto katu = make_shared<PMDActor>(_dx12, "Model/ikaruga/斑鳩Ver1.10SW.pmd");
+	auto katu = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
 	katu->Move(10, 0, 0);
 	_pmdRenderer->AddActor(katu);
-	//_dx12->AddPMDActor(&*_actor);
 
 
 	_pmdRenderer->AnimationStart();
 	return true;
 }
-void Application::SyncronizeEffecseerCamera()
+void Application::SyncronizeEffekseerCamera()
 {
 	Effekseer::Matrix44 fkViewMat;
 	Effekseer::Matrix44 fkProjMat;
@@ -301,7 +292,7 @@ Application::Run() {
 		else {
 			shotFlg = false;
 		}
-		SyncronizeEffecseerCamera();
+		SyncronizeEffekseerCamera();
 		_actor->Move(px, py, pz);
 		
 		_dx12->MoveEyePosition(x, y, z);
@@ -322,8 +313,9 @@ Application::Run() {
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
 
-		//縮小バッファへ描画
-		_dx12->DrawToShrinkBuffer();
+		auto efkpos=_efkManager->GetLocation(_efkHandle);
+		efkpos.X += 0.1f;
+		_efkManager->SetLocation(_efkHandle, efkpos);
 
 		//エフェクト描画
 		_efkManager->Update();//マネージャの更新(時間更新)
@@ -333,14 +325,14 @@ Application::Run() {
 		_efkManager->Draw();//エフェクト描画
 		_efkRenderer->EndRendering();//描画後処理
 		EffekseerRendererDX12::EndCommandList(_efkCmdList);
-		
 
+		//縮小バッファへ描画
+		_dx12->DrawToShrinkBuffer();
 
-		//2枚目(ペラポリ1→ペラポリ2へ)
-		//_dx12->DrawToPera2();
+		//2枚目
 		_dx12->DrawAmbientOcclusion();
 
-		//3枚目(ペラポリ2→バックバッファへ)
+		//3枚目
 		_dx12->Clear();
 		_dx12->Draw(_pmdRenderer);
 
