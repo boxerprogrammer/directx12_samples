@@ -120,7 +120,7 @@ Application::Initialize() {
 	_heapForSpriteFont = _dx12->CreateDescriptorHeapForSpriteFont();
 	spriteFont = new DirectX::SpriteFont(_dx12->Device(),
 		resUploadBatch,
-		L"font/fonttest.spritefont",
+		L"font/meiryo.spritefont",
 		_heapForSpriteFont->GetCPUDescriptorHandleForHeapStart(),
 		_heapForSpriteFont->GetGPUDescriptorHandleForHeapStart());
 	auto future = resUploadBatch.End(_dx12->CmdQue());
@@ -415,8 +415,8 @@ Application::Run() {
 
 		_dx12->CmdList()->SetDescriptorHeaps(1, _heapForSpriteFont.GetAddressOf());
 		_spriteBatch->Begin(_dx12->CmdList());
-		spriteFont->DrawString(_spriteBatch, "Hello World", DirectX::XMFLOAT2(102, 102), DirectX::Colors::Black);
-		spriteFont->DrawString(_spriteBatch, "Hello World", DirectX::XMFLOAT2(100, 100), DirectX::Colors::Yellow);
+		spriteFont->DrawString(_spriteBatch, L"こんにちはハロー", DirectX::XMFLOAT2(102, 102), DirectX::Colors::Black);
+		spriteFont->DrawString(_spriteBatch, L"こんにちはハロー", DirectX::XMFLOAT2(100, 100), DirectX::Colors::Yellow);
 		_spriteBatch->End();
 
 
