@@ -53,7 +53,7 @@ float SsaoPS(Input input) :SV_TARGET{
 
 	float ao = 0.0;//“–‚½‚Á‚½‚¾‚¯‰ÁZ‚³‚ê‚é
 	float accum = 0.0;//ƒÎ‚É“–‚½‚é‚â‚Â(‚·‚×‚Ä1‚¾‚Á‚½‚Ì‘˜a)
-	const int trycnt = tryCount%400;
+	const int trycnt = tryCount%128;
 	const float radius = aoRadius;
 	if (dp < 1.0f) {
 		float4 norm = texNorm.Sample(smp, input.uv);
