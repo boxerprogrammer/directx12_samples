@@ -46,9 +46,10 @@ IDXGISwapChain4* _swapchain = nullptr;
 
 void EnableDebugLayer(){
 	ID3D12Debug* debugLayer=nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer)))) {
+		debugLayer->EnableDebugLayer();
+		debugLayer->Release();
+	}
 }
 
 #ifdef _DEBUG
@@ -94,7 +95,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		D3D_FEATURE_LEVEL_11_1,
 		D3D_FEATURE_LEVEL_11_0,
 	};
-	auto result = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG,IID_PPV_ARGS(&_dxgiFactory));
+	HRESULT result = S_OK;
+	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory)))) {
+		if(FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&_dxgiFactory)))) {
+			return -1;
+		}
+	}
 	std::vector <IDXGIAdapter*> adapters;
 	IDXGIAdapter* tmpAdapter = nullptr;
 	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i) {

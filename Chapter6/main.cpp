@@ -54,9 +54,10 @@ IDXGISwapChain4* _swapchain = nullptr;
 
 void EnableDebugLayer() {
 	ID3D12Debug* debugLayer = nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer)))) {
+		debugLayer->EnableDebugLayer();
+		debugLayer->Release();
+	}
 }
 
 #ifdef _DEBUG
@@ -556,6 +557,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 		_cmdList->IASetIndexBuffer(&ibView);
 
+		_cmdList->SetGraphicsRootSignature(rootsignature);
 		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
 

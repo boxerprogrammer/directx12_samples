@@ -51,10 +51,11 @@ ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
 
 void EnableDebugLayer(){
-	ID3D12Debug* debugLayer=nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
+	ID3D12Debug* debugLayer = nullptr;
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer)))) {
+		debugLayer->EnableDebugLayer();
+		debugLayer->Release();
+	}
 }
 
 #ifdef _DEBUG

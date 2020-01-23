@@ -63,9 +63,10 @@ AlignmentedSize(size_t size, size_t alignment) {
 
 void EnableDebugLayer() {
 	ID3D12Debug* debugLayer = nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer)))) {
+		debugLayer->EnableDebugLayer();
+		debugLayer->Release();
+	}
 }
 
 #ifdef _DEBUG
@@ -452,7 +453,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	resDesc.Format = DXGI_FORMAT_UNKNOWN;
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;//単なるバッファとして
 	auto pixelsize = scratchImg.GetPixelsSize();
-	resDesc.Width = AlignmentedSize(img->rowPitch,D3D12_TEXTURE_DATA_PITCH_ALIGNMENT)*img->height;//データサイズ
+	resDesc.Width = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT)*img->height;//データサイズ
+
 	resDesc.Height = 1;//
 	resDesc.DepthOrArraySize = 1;//
 	resDesc.MipLevels = 1;
@@ -506,8 +508,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	auto rowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 	for (int y = 0; y < img->height; ++y) {
 		std::copy_n(srcAddress,
-				rowPitch, 
-				mapforImg);//コピー
+			rowPitch,
+			mapforImg);//コピー
 		//1行ごとの辻褄を合わせてやる
 		srcAddress += img->rowPitch;
 		mapforImg += rowPitch;
@@ -531,7 +533,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	src.PlacedFootprint.Footprint.Width = metadata.width;
 	src.PlacedFootprint.Footprint.Height = metadata.height;
 	src.PlacedFootprint.Footprint.Depth = metadata.depth;
-	src.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch,D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	src.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 	src.PlacedFootprint.Footprint.Format = img->format;
 
 	
