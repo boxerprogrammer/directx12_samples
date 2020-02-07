@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{8482CF1B-AC98-4420-983C-89A9B0293ED5}</ProjectGuid>
+    <ProjectGuid>{E32B8858-6AE1-48BA-8BCB-E90B4B1A004B}</ProjectGuid>
     <RootNamespace>Dx12BookSamples</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
     <ProjectName>Chapter03(Init and Clear)</ProjectName>
