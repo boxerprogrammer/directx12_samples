@@ -87,7 +87,7 @@ PMDRenderer::Pipeline() {
 
 bool 
 PMDRenderer::CreateRootSignature() {
-	D3D12_DESCRIPTOR_RANGE range[5] = {};
+	D3D12_DESCRIPTOR_RANGE range[6] = {};
 	//レンジ0は座標変換(カメラとワールドのふたつ)b1
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[0].BaseShaderRegister = 1;//1
@@ -112,13 +112,17 @@ PMDRenderer::CreateRootSignature() {
 	//レンジ3はアクターの座標変換(ワールドとボーン)
 	range[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[3].BaseShaderRegister = 2;//2
-	range[3].NumDescriptors = 2;
+	range[3].NumDescriptors = 2;//b2,b3
 	range[3].OffsetInDescriptorsFromTableStart = 0;
 	range[3].RegisterSpace = 0;
 
+	//t4(深度)
 	range[4] = CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4);
 	
-	CD3DX12_ROOT_PARAMETER rp[4] = {};
+	//b4(表示設定)
+	range[5]= CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 4);
+
+	CD3DX12_ROOT_PARAMETER rp[5] = {};
 	//マテリアル用(テクスチャも含む)
 	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -139,10 +143,11 @@ PMDRenderer::CreateRootSignature() {
 
 	rp[3].InitAsDescriptorTable(1, &range[4]);
 
+	rp[4].InitAsDescriptorTable(1, &range[5]);
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsDesc.NumParameters = 4;
+	rsDesc.NumParameters = 5;
 	rsDesc.pParameters = rp;
 
 	D3D12_STATIC_SAMPLER_DESC sampler[3] = {};
@@ -167,15 +172,15 @@ PMDRenderer::CreateRootSignature() {
 	sampler[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 	sampler[1].ShaderRegister = 1;
 
-	sampler[2] = sampler[0];//殆ど同じなので通常のサンプラの情報をコピー
+	sampler[2] = sampler[0];
 	sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;//<=であればtrue(1.0)そうでなければ(0.0)
-	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;//比較結果をバイリニア補間
-	sampler[2].MaxAnisotropy = 1;//深度傾斜を有効に
+	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+	sampler[2].MinLOD = -D3D12_FLOAT32_MAX;
 	sampler[2].ShaderRegister = 2;
-	
+	sampler[2].MaxAnisotropy = 1;
 
 
 	rsDesc.NumStaticSamplers = 3;
@@ -260,10 +265,11 @@ PMDRenderer::CreatePipeline() {
 
 	//出力
 	plsDesc.NumRenderTargets = 3;//レンダーターゲット数
+	//↑で指定したレンダーターゲット数は「必ず」設定しなければ
+	//ならない↓
 	plsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	plsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	plsDesc.RTVFormats[2] = DXGI_FORMAT_R8G8B8A8_UNORM;
-
 
 	plsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	plsDesc.BlendState.RenderTarget[0].BlendEnable = true;//今のところfalse
@@ -303,11 +309,12 @@ PMDRenderer::CreatePipeline() {
 	if (!CheckResult(result, errBlob)) {
 		return false;
 	}
-
+	result = D3DCompileFromFile(L"BasicShader.hlsl", nullptr, nullptr, "shadowPS", "ps_5_0", 0, 0, &psBlob, &errBlob);
+	if (!CheckResult(result, errBlob)) {
+		return false;
+	}
 	plsDesc.VS = CD3DX12_SHADER_BYTECODE(vsBlob);
-	plsDesc.PS.BytecodeLength =0 ;
-	plsDesc.PS.pShaderBytecode = nullptr;
-	plsDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	plsDesc.PS = CD3DX12_SHADER_BYTECODE(psBlob);
 	result = _dx->Device()->CreateGraphicsPipelineState(&plsDesc, IID_PPV_ARGS(_plsShadow.ReleaseAndGetAddressOf()));
 
 	if (!CheckResult(result)) {

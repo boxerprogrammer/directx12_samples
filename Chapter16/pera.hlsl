@@ -22,6 +22,11 @@ cbuffer Weights : register(b0) {
 	float4 wgts[2];
 };
 
+cbuffer PostSetting : register(b1) {
+	bool isDebugDisp;//デバッグ表示フラグ
+	bool isSSAO;//SSAO有効フラグ
+	float3 bloomColor;//ブルームの着色
+};
 
 
 struct Output {
@@ -89,24 +94,40 @@ Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
 }
 
 float4 PS(Output input) : SV_TARGET{
-	if (input.uv.x<0.2&&input.uv.y < 0.2) {//深度出力
-		float depth = depthTex.Sample(smp, input.uv*5);
-		depth = 1.0f - pow(depth, 30);
-		return float4(depth, depth, depth, 1);
-	}else if (input.uv.x < 0.2&&input.uv.y < 0.4) {//ライトからの深度出力
-		float depth = lightDepthTex.Sample(smp, (input.uv-float2(0,0.2)) * 5);
-		depth = 1 - depth;
-		return float4(depth, depth, depth, 1);
-	}else if (input.uv.x < 0.2&&input.uv.y < 0.6) {//法線出力
-		return texNormal.Sample(smp, (input.uv - float2(0, 0.4)) * 5);
+	if (isDebugDisp) {//デバッグ出力
+		if (input.uv.x < 0.2&&input.uv.y < 0.2) {//深度出力
+			float depth = depthTex.Sample(smp, input.uv * 5);
+			depth = 1.0f - pow(depth, 30);
+			return float4(depth, depth, depth, 1);
+		}
+		else if (input.uv.x < 0.2&&input.uv.y < 0.4) {//ライトからの深度出力
+			float depth = lightDepthTex.Sample(smp, (input.uv - float2(0,0.2)) * 5);
+			depth = 1 - depth;
+			return float4(depth, depth, depth, 1);
+		}
+		else if (input.uv.x < 0.2&&input.uv.y < 0.6) {//法線出力
+			return texNormal.Sample(smp, (input.uv - float2(0, 0.4)) * 5);
+		}
+		else if (input.uv.x < 0.2&&input.uv.y < 0.8) {//AO
+			float s = texSSAO.Sample(smp, (input.uv - float2(0, 0.6)) * 5);
+			return float4(s,s,s,1);
+		}
 	}
-	else if (input.uv.x < 0.2&&input.uv.y < 0.8) {//AO
-		float s=texSSAO.Sample(smp, (input.uv - float2(0, 0.6)) * 5);
-		return float4(s,s,s,1);
+	float w, h, miplevels;
+	tex.GetDimensions(0, w, h, miplevels);
+	float dx = 1.0 / w;
+	float dy = 1.0 / h;
+	float4 bloomAccum = float4(0, 0, 0, 0);
+	float2 uvSize = float2(1, 0.5);
+	float2 uvOfst = float2(0, 0);
+	for (int i = 0; i < 8; ++i) {
+		bloomAccum += Get5x5GaussianBlur(texShrinkHighLum, smp, input.uv*uvSize + uvOfst, dx, dy, float4(uvOfst, uvOfst + uvSize));
+		uvOfst.y += uvSize.y;
+		uvSize *= 0.5f;
 	}
 
 	float4 col=tex.Sample(smp, input.uv);
-	return float4(col.rgb*texSSAO.Sample(smp, input.uv),col.a);
+	return float4(col.rgb*texSSAO.Sample(smp, input.uv),col.a)+float4(bloomAccum.xyz*bloomColor,bloomAccum.a);
 }
 
 float4 VerticalBlurPS(Output input) : SV_TARGET{

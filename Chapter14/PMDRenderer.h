@@ -17,6 +17,8 @@ private:
 	bool CreateRootSignature();
 	bool CreatePipeline();
 	ComPtr<ID3D12PipelineState> _pls;
+	ComPtr<ID3D12PipelineState> _plsShadow;
+
 	ComPtr<ID3D12RootSignature> _rootSignature;
 	std::vector<std::shared_ptr<PMDActor>> _actors;
 	std::shared_ptr<Dx12Wrapper> _dx;
@@ -32,6 +34,10 @@ public:
 	ID3D12PipelineState* Pipeline();
 
 	void Update();
+
+	void BeforeDrawFromLight();
+	void DrawFromLight();
+
 	void BeforeDraw();
 
 	void Draw();

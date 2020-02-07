@@ -4,10 +4,12 @@
 #include"PMDRenderer.h"
 #include<Effekseer.h>
 #include<EffekseerRendererDX12.h>
+#include<SpriteFont.h>
 #include"imgui/imgui.h"
 #include"imgui/imgui_impl_win32.h"
 #include"imgui/imgui_impl_dx12.h"
-
+#include<SpriteFont.h>//文字列を表示するのに必要なもの
+#include<ResourceUploadBatch.h>//DXTK系列のリソースを使用するのに必要なもの
 
 //----エフェクトに必要なものの基本--------------
 //エフェクトレンダラ
@@ -30,6 +32,13 @@ Effekseer::Handle _efkHandle;
 using namespace std;
 constexpr int window_width = 1280;
 constexpr int window_height = 720;
+
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heapImgui;
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heapForSpriteFont;
+
+DirectX::GraphicsMemory* _gmemory = nullptr;//グラフィクスメモリオブジェクト
+DirectX::SpriteFont* spriteFont = nullptr;//フォント表示用オブジェクト
+DirectX::SpriteBatch* _spriteBatch = nullptr;//スプライト表示用オブジェクト
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -56,8 +65,6 @@ Application::Application()
 Application::~Application()
 {
 }
-
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heapImgui;
 
 bool 
 Application::Initialize() {
@@ -101,15 +108,36 @@ Application::Initialize() {
 	if (!_dx12->Init()) {
 		return false;
 	}
-	heapImgui= _dx12->CreateDescriptorHeapForImgUi();
+
+	//フォント用処理
+	_gmemory = new DirectX::GraphicsMemory(_dx12->Device());
+	DirectX::ResourceUploadBatch resUploadBatch(_dx12->Device());
+	resUploadBatch.Begin();
+	DirectX::RenderTargetState rtState(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D32_FLOAT);
+	DirectX::SpriteBatchPipelineStateDescription pd(rtState);
+	_spriteBatch = new DirectX::SpriteBatch(_dx12->Device(), resUploadBatch, pd);
+
+	_heapForSpriteFont = _dx12->CreateDescriptorHeapForSpriteFont();
+	spriteFont = new DirectX::SpriteFont(_dx12->Device(),
+		resUploadBatch,
+		L"font/hgpop.spritefont",
+		_heapForSpriteFont->GetCPUDescriptorHandleForHeapStart(),
+		_heapForSpriteFont->GetGPUDescriptorHandleForHeapStart());
+	auto future = resUploadBatch.End(_dx12->CmdQue());
+	_dx12->WaitForCommandQueue();
+	future.wait();
+	_spriteBatch->SetViewport(_dx12->GetViewPort());
+
+
+	_heapImgui= _dx12->CreateDescriptorHeapForImgUi();
 	ImGui::CreateContext();
 	ImGui_ImplWin32_Init(_hwnd);
 	ImGui_ImplDX12_Init(_dx12->Device(),
 		3,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
-		heapImgui.Get(),
-		heapImgui->GetCPUDescriptorHandleForHeapStart(),
-		heapImgui->GetGPUDescriptorHandleForHeapStart());
+		_heapImgui.Get(),
+		_heapImgui->GetCPUDescriptorHandleForHeapStart(),
+		_heapImgui->GetGPUDescriptorHandleForHeapStart());
 	
 
 	DXGI_FORMAT bbFormats[] = { DXGI_FORMAT_R8G8B8A8_UNORM,DXGI_FORMAT_R8G8B8A8_UNORM };
@@ -382,9 +410,14 @@ Application::Run() {
 			_dx12->SetFocusPos(pnt.x, pnt.y);
 		}
 
-		_dx12->CmdList()->SetDescriptorHeaps(1, heapImgui.GetAddressOf());
+		_dx12->CmdList()->SetDescriptorHeaps(1, _heapImgui.GetAddressOf());
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _dx12->CmdList());
 
+		_dx12->CmdList()->SetDescriptorHeaps(1, _heapForSpriteFont.GetAddressOf());
+		_spriteBatch->Begin(_dx12->CmdList());
+		spriteFont->DrawString(_spriteBatch, L"DirectX12の魔導書", DirectX::XMFLOAT2(102, 102), DirectX::Colors::Black);
+		spriteFont->DrawString(_spriteBatch, L"DirectX12の魔導書", DirectX::XMFLOAT2(100, 100), DirectX::Colors::Yellow);
+		_spriteBatch->End();
 
 
 		_dx12->Flip();

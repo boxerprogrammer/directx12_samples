@@ -1,46 +1,40 @@
 #pragma once
-
 #include<d3d12.h>
-#include<vector>
 #include<wrl.h>
+#include<vector>
 #include<memory>
 
-class Dx12Wrapper;
+using Microsoft::WRL::ComPtr;
 class PMDActor;
+class Dx12Wrapper;
+
+///PMD描画のための共通部分を
+///ここに持っている
+///個別の部分はPMDActorに持たせる
 class PMDRenderer
 {
-	friend PMDActor;
 private:
-	Dx12Wrapper& _dx12;
-	template<typename T>
-	using ComPtr = Microsoft::WRL::ComPtr<T>;
-
-	ComPtr< ID3D12PipelineState> _pipeline = nullptr;//PMD用パイプライン
-	ComPtr< ID3D12RootSignature> _rootSignature = nullptr;//PMD用ルートシグネチャ
-
-	//PMD用共通テクスチャ(白、黒、グレイスケールグラデーション)
-	ComPtr<ID3D12Resource> _whiteTex = nullptr;
-	ComPtr<ID3D12Resource> _blackTex = nullptr;
-	ComPtr<ID3D12Resource> _gradTex = nullptr;
-
-	ID3D12Resource* CreateDefaultTexture(size_t width,size_t height);
-	ID3D12Resource* CreateWhiteTexture();//白テクスチャの生成
-	ID3D12Resource*	CreateBlackTexture();//黒テクスチャの生成
-	ID3D12Resource*	CreateGrayGradationTexture();//グレーテクスチャの生成
-
-	//パイプライン初期化
-	HRESULT CreateGraphicsPipelineForPMD();
-	//ルートシグネチャ初期化
-	HRESULT CreateRootSignature();
-
-	bool CheckShaderCompileResult(HRESULT result , ID3DBlob* error=nullptr);
-
+	bool CreateRootSignature();
+	bool CreatePipeline();
+	ComPtr<ID3D12PipelineState> _pls;
+	ComPtr<ID3D12RootSignature> _rootSignature;
+	std::vector<std::shared_ptr<PMDActor>> _actors;
+	std::shared_ptr<Dx12Wrapper> _dx;
 public:
-	PMDRenderer(Dx12Wrapper& dx12);
+	PMDRenderer(std::shared_ptr<Dx12Wrapper> dx);
 	~PMDRenderer();
+
+	void Init();
+	
+	void AddActor(std::shared_ptr<PMDActor> actor);
+	void AddActor(const char* filepath);
+	ID3D12RootSignature* RootSignature();
+	ID3D12PipelineState* Pipeline();
+
 	void Update();
+	void BeforeDraw();
+
 	void Draw();
-	ID3D12PipelineState* GetPipelineState();
-	ID3D12RootSignature* GetRootSignature();
+	void AnimationStart();
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include<d3d12.h>
+#include<vector>
 
 class Helper
 {
@@ -24,16 +25,14 @@ extern unsigned int AligmentedValue(unsigned int size, unsigned int alignment = 
 
 
 //１バイトstringをワイド文字wstringに変換する
-extern std::wstring WStringFromString(const std::string& str);
+std::wstring WStringFromString(const std::string& str);
 
 ///拡張子を返す
 ///@param path 元のパス文字列
 ///@return 拡張子文字列
-extern std::wstring GetExtension(const std::wstring& path);
+std::wstring GetExtension(const std::wstring& path);
 
-///ガウスウェイト値を返す
-///@param count 片側いくつのウェイト値を持っておくか
-///@param s ガウス関数におけるσ値
-///@retval ガウスウェイト配列(countで指定された可変長配列)
-///@remarks 全てのウェイト値を足したら1になるはずなので
-extern std::vector<float> GetGaussianWeights(size_t count, float s);
+///ガウス関数をサンプリングしたものを配列として返す
+///@param s 分散
+///@param sampleNum サンプルをいくつにするか
+std::vector<float> GetGaussianValues(float s, size_t sampleNum);

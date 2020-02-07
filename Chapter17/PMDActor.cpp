@@ -301,6 +301,49 @@ PMDActor::PMDActor(shared_ptr<Dx12Wrapper> dx ,const char* path):_dx(dx),_pos(0,
 	if (!CreateMaterialBufferView()) {
 		return;
 	}
+	LoadVMDData("motion/ヤゴコロダンス.vmd");
+
+	//auto& shoulder = _boneTable["左腕"].pos;
+	//auto shoulderMat = XMMatrixTranslation(-shoulder.x, -shoulder.y, -shoulder.z)*
+	//	XMMatrixRotationZ(XM_PIDIV2) *
+	//	XMMatrixTranslation(shoulder.x, shoulder.y, shoulder.z);//90°曲げる
+
+	//auto& elbow = _boneTable["左ひじ"].pos;
+	//auto elbowMat=XMMatrixTranslation(-elbow.x, -elbow.y, -elbow.z)*
+	//	XMMatrixRotationZ(XM_PIDIV2) *
+	//	XMMatrixTranslation(elbow.x, elbow.y, elbow.z);//90°曲げる
+
+	//auto& wrist = _boneTable["左手首"].pos;
+	//auto wristMat = XMMatrixTranslation(-wrist.x, -wrist.y, -wrist.z)*
+	//	XMMatrixRotationZ(-XM_PIDIV2) *
+	//	XMMatrixTranslation(wrist.x, wrist.y, wrist.z);//90°曲げる
+	//
+	//_boneMatrices[_boneTable["左腕"].index] = shoulderMat;
+	//_boneMatrices[_boneTable["左ひじ"].index] = elbowMat;
+	//_boneMatrices[_boneTable["左手首"].index] = wristMat;
+
+
+	//auto& rshoulder = _boneTable["右腕"].pos;
+	// shoulderMat = XMMatrixTranslation(-rshoulder.x, -rshoulder.y, -shoulder.z)*
+	//	XMMatrixRotationZ(-XM_PIDIV2) *
+	//	XMMatrixTranslation(rshoulder.x, rshoulder.y, rshoulder.z);//90°曲げる
+
+	//auto& relbow = _boneTable["右ひじ"].pos;
+	// elbowMat = XMMatrixTranslation(-relbow.x, -relbow.y, -relbow.z)*
+	//	XMMatrixRotationZ(-XM_PIDIV2) *
+	//	XMMatrixTranslation(relbow.x, relbow.y, relbow.z);//90°曲げる
+
+	//auto& rwrist = _boneTable["右手首"].pos;
+	// wristMat = XMMatrixTranslation(-rwrist.x, -rwrist.y, -rwrist.z)*
+	//	XMMatrixRotationZ(XM_PIDIV2) *
+	//	XMMatrixTranslation(rwrist.x, rwrist.y, rwrist.z);//90°曲げる
+
+
+	//_boneMatrices[_boneTable["右腕"].index] = shoulderMat;
+	//_boneMatrices[_boneTable["右ひじ"].index] = elbowMat;
+	//_boneMatrices[_boneTable["右手首"].index] = wristMat;
+
+	//RecursiveBoneTransform(_boneTable["センター"].index,XMMatrixIdentity());
 		
 
 	if (!CreateBoneBuffer()) {

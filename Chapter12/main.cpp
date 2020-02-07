@@ -1,15 +1,12 @@
+#include<iostream>
 #include"Application.h"
 
-#ifndef _DEBUG
-int main() {
-#else
-#include<Windows.h>
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-#endif
+using namespace std;
+
+//int main() {
+int WINAPI WinMain(HINSTANCE ,HINSTANCE ,LPSTR,int){
 	auto& app = Application::Instance();
-	if (!app.Init()) {
-		return -1;
-	}
+	if (!app.Initialize())return -1;
 	app.Run();
 	app.Terminate();
 	return 0;

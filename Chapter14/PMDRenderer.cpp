@@ -24,6 +24,22 @@ PMDRenderer::Update() {
 	}
 }
 
+
+void 
+PMDRenderer::DrawFromLight() {
+	
+	for (auto& actor : _actors) {
+		actor->Draw(true);
+	}
+}
+
+void 
+PMDRenderer::BeforeDrawFromLight() {
+	auto cmdlist = _dx->CmdList();
+	cmdlist->SetPipelineState(_plsShadow.Get());
+	cmdlist->SetGraphicsRootSignature(_rootSignature.Get());
+}
+
 void 
 PMDRenderer::BeforeDraw() {
 	auto cmdlist = _dx->CmdList();
@@ -71,7 +87,7 @@ PMDRenderer::Pipeline() {
 
 bool 
 PMDRenderer::CreateRootSignature() {
-	D3D12_DESCRIPTOR_RANGE range[4] = {};
+	D3D12_DESCRIPTOR_RANGE range[5] = {};
 	//レンジ0は座標変換(カメラとワールドのふたつ)b1
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[0].BaseShaderRegister = 1;//1
@@ -100,7 +116,9 @@ PMDRenderer::CreateRootSignature() {
 	range[3].OffsetInDescriptorsFromTableStart = 0;
 	range[3].RegisterSpace = 0;
 
-	D3D12_ROOT_PARAMETER rp[3] = {};
+	range[4] = CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4);
+	
+	CD3DX12_ROOT_PARAMETER rp[4] = {};
 	//マテリアル用(テクスチャも含む)
 	rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -119,13 +137,15 @@ PMDRenderer::CreateRootSignature() {
 	rp[2].DescriptorTable.NumDescriptorRanges = 1;
 	rp[2].DescriptorTable.pDescriptorRanges = &range[3];
 
+	rp[3].InitAsDescriptorTable(1, &range[4]);
+
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsDesc.NumParameters = 3;
+	rsDesc.NumParameters = 4;
 	rsDesc.pParameters = rp;
 
-	D3D12_STATIC_SAMPLER_DESC sampler[2] = {};
+	D3D12_STATIC_SAMPLER_DESC sampler[3] = {};
 	sampler[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	sampler[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	sampler[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -147,7 +167,18 @@ PMDRenderer::CreateRootSignature() {
 	sampler[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 	sampler[1].ShaderRegister = 1;
 
-	rsDesc.NumStaticSamplers = 2;
+	sampler[2] = sampler[0];//殆ど同じなので通常のサンプラの情報をコピー
+	sampler[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;//<=であればtrue(1.0)そうでなければ(0.0)
+	sampler[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;//比較結果をバイリニア補間
+	sampler[2].MaxAnisotropy = 1;//深度傾斜を有効に
+	sampler[2].ShaderRegister = 2;
+	
+
+
+	rsDesc.NumStaticSamplers = 3;
 	rsDesc.pStaticSamplers = sampler;
 	ID3DBlob* rsBlob = nullptr;//ルートシグネチャを構成するためのブロブ
 	ID3DBlob* errBlob = nullptr;
@@ -220,16 +251,19 @@ PMDRenderer::CreatePipeline() {
 	plsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 
 	plsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;//カリング
+	plsDesc.RasterizerState.DepthBias = 0.1f;
+	plsDesc.RasterizerState.SlopeScaledDepthBias = 0.01f;
 
 	//ピクセルシェーダ
 	plsDesc.PS = CD3DX12_SHADER_BYTECODE(psBlob);
 
 
 	//出力
-	plsDesc.NumRenderTargets = 1;//レンダーターゲット数
-	//↑で指定したレンダーターゲット数は「必ず」設定しなければ
-	//ならない↓
+	plsDesc.NumRenderTargets = 3;//レンダーターゲット数
 	plsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	plsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	plsDesc.RTVFormats[2] = DXGI_FORMAT_R8G8B8A8_UNORM;
+
 
 	plsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	plsDesc.BlendState.RenderTarget[0].BlendEnable = true;//今のところfalse
@@ -261,6 +295,23 @@ PMDRenderer::CreatePipeline() {
 	plsDesc.pRootSignature = _rootSignature.Get();
 
 	result = _dx->Device()->CreateGraphicsPipelineState(&plsDesc, IID_PPV_ARGS(&_pls));
-	CheckResult(result);
+	if (!CheckResult(result)) {
+		return false;
+	}
+
+	result = D3DCompileFromFile(L"BasicShader.hlsl", nullptr, nullptr, "shadowVS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
+	if (!CheckResult(result, errBlob)) {
+		return false;
+	}
+
+	plsDesc.VS = CD3DX12_SHADER_BYTECODE(vsBlob);
+	plsDesc.PS.BytecodeLength =0 ;
+	plsDesc.PS.pShaderBytecode = nullptr;
+	plsDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	result = _dx->Device()->CreateGraphicsPipelineState(&plsDesc, IID_PPV_ARGS(_plsShadow.ReleaseAndGetAddressOf()));
+
+	if (!CheckResult(result)) {
+		return false;
+	}
 	return true;
 }

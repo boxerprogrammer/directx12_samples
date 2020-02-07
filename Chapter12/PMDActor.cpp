@@ -1,65 +1,113 @@
 #include "PMDActor.h"
-#include"PMDRenderer.h"
-#include"Dx12Wrapper.h"
-#include<d3dx12.h>
-#include<sstream>
-#include<array>
-using namespace Microsoft::WRL;
-using namespace std;
-using namespace DirectX;
+#include<iostream>
+#include<cassert>
+#include<DirectXMath.h>
+#include<string>
 
-#pragma comment(lib,"winmm.lib")
+
+#include<sstream>//文字列ストリーム用
+#include<iomanip>//文字列マニピュレータ用(n桁そろえとか0埋めとかに使う)
+
+#include<Windows.h>
+#include<d3d12.h>
+#include<d3dx12.h>
+
+#include"Dx12Wrapper.h"
+#include"Helper.h"
+
+using namespace DirectX;
+using namespace std;
 
 namespace {
-	///テクスチャのパスをセパレータ文字で分離する
-	///@param path 対象のパス文字列
-	///@param splitter 区切り文字
-	///@return 分離前後の文字列ペア
-	pair<string, string>
-		SplitFileName(const std::string& path, const char splitter = '*') {
-		int idx = path.find(splitter);
-		pair<string, string> ret;
-		ret.first = path.substr(0, idx);
-		ret.second = path.substr(idx + 1, path.length() - idx - 1);
+
+	string GetDirectoryFromPath(string path) {
+		int pos1 = path.rfind('/');
+		int pos2 = path.rfind('\\');
+		if (pos1 == string::npos&&pos2 == string::npos) {
+			return "";
+		}
+		int pos=max(pos1, pos2);
+		return path.substr(0, pos + 1);
+	}
+	///文字列を分離する
+	///@param str 分離対象の文字列
+	///@param separator 分離文字(ここで分離する目印)
+	///@return 分離後の文字列ベクタ配列
+	std::vector<string> SeparateString(const std::string& str, const char separator = '*') {
+		vector<string> ret;//戻り値用
+		//例えば文字列が"a.bmp*b.sph"だったとする
+		//これをstringのfindとsubstrを使用して分離するよ
+		size_t idx = 0;
+		size_t offset = 0;
+		do {
+			idx = str.find('*',offset);
+			if (idx != string::npos) {
+				ret.emplace_back(str.substr(offset,idx-offset));
+				offset = idx + 1;
+			}
+			else {
+				ret.emplace_back(str.substr(offset));
+			}
+		} while (idx != string::npos);
 		return ret;
 	}
-	///ファイル名から拡張子を取得する
-	///@param path 対象のパス文字列
-	///@return 拡張子
-	string
-		GetExtension(const std::string& path) {
-		int idx = path.rfind('.');
-		return path.substr(idx + 1, path.length() - idx - 1);
+	///拡張子を返す
+	///@param path 元のパス文字列
+	///@return 拡張子文字列
+	string GetExtension(const string& path) {
+		int index = path.find_last_of('.');
+		return path.substr(index + 1, path.length() - index);
 	}
-	///モデルのパスとテクスチャのパスから合成パスを得る
-	///@param modelPath アプリケーションから見たpmdモデルのパス
-	///@param texPath PMDモデルから見たテクスチャのパス
-	///@return アプリケーションから見たテクスチャのパス
-	std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, const char* texPath) {
-		//ファイルのフォルダ区切りは\と/の二種類が使用される可能性があり
-		//ともかく末尾の\か/を得られればいいので、双方のrfindをとり比較する
-		//int型に代入しているのは見つからなかった場合はrfindがepos(-1→0xffffffff)を返すため
-		int pathIndex1 = modelPath.rfind('/');
-		int pathIndex2 = modelPath.rfind('\\');
-		auto pathIndex = max(pathIndex1, pathIndex2);
-		auto folderPath = modelPath.substr(0, pathIndex + 1);
-		return folderPath + texPath;
+	constexpr float epsilon = 0.0005f;
+	///ベジェにおいてXからYを返す
+	///@param cPoints コントロールポイント(真ん中の２つ)
+	///@param x yを取得するためのx
+	///@param trycnt 近似の試行回数
+	float GetYFromXOnBezier(const std::array<XMFLOAT2,2>& cPoints,float x,uint32_t trycnt=8) {
+		//ベジェの式
+		// P = P0*(1-t)^3 + 3P1*(1-t)^2*t + 3P2*(1-t)*t^2 + P3*t^3
+		// そもそもの手順はx座標から(近似を用いて)tを求め、
+		// その得られたtをもとにベジェの式によりyを返す
+		//ただし、P0=(0,0),P1=(1,1)
+
+			   
+		//もしp1.x==p1.y && p2.x==p2.yの場合、これは曲線ではない
+		//計算がもったいないのでそのまま返す
+		if (cPoints[0].x == cPoints[0].y && cPoints[1].x == cPoints[1].y) {
+			return x;
+		}
+
+		float t = x;
+		float r = 1.0f - t;
+		for (int i = 0; i < trycnt; ++i) {
+			float fx = 3 * cPoints[0].x * r*r*t +
+				3*cPoints[1].x * r*t*t +
+				t*t*t - x;
+
+			if (abs(fx) <= epsilon) {
+				break;
+			}
+
+			t -= fx / 2.0f;
+			r = 1.0f - t;
+		}
+
+		return 3 * cPoints[0].y * r*r*t +
+			3 * cPoints[1].y * r*t*t +
+			t * t*t;
 	}
-
-
 	///Z軸を特定の方向を向かす行列を返す関数
-	///@param lookat 向かせたい方向ベクトル
-	///@param up 上ベクトル
-	///@param right 右ベクトル
+///@param lookat 向かせたい方向ベクトル
+///@param up 上ベクトル
+///@param right 右ベクトル
 	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
 		//向かせたい方向(z軸)
-		XMVECTOR vz = lookat;
+		XMVECTOR vz = XMVector3Normalize(lookat);
 
 		//(向かせたい方向を向かせたときの)仮のy軸ベクトル
 		XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
 
 		//(向かせたい方向を向かせたときの)y軸
-		//XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vz, vx));
 		XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vy, vz));
 		vy = XMVector3Normalize(XMVector3Cross(vz, vx));
 
@@ -89,972 +137,776 @@ namespace {
 		return XMMatrixTranspose(LookAtMatrix(origin, up, right))*
 			LookAtMatrix(lookat, up, right);
 	}
-	//ボーン種別
-	enum class BoneType {
-		Rotation,//回転
-		RotAndMove,//回転＆移動
-		IK,//IK
-		Undefined,//未定義
-		IKChild,//IK影響ボーン
-		RotationChild,//回転影響ボーン
-		IKDestination,//IK接続先
-		Invisible//見えないボーン
+}
+
+std::vector<uint16_t>& 
+PMDActor::GetIndexData() {
+	return _indexData;
+}
+unsigned int 
+PMDActor::GetIndexNum()const {
+	return _indexNum;
+}
+
+unsigned int 
+PMDActor::GetVertexNum()const {
+	return _vertNum;
+}
+
+bool 
+PMDActor::LoadFromPMD(const char* filepath) {
+	FILE* fp=nullptr;
+	auto err = fopen_s(&fp,filepath, "rb");
+	assert(fp != nullptr);
+	if (fp == nullptr)return false;
+
+#pragma pack(1)
+	struct PMDHeader {
+		char signature[3];//3
+		//パディング１が入る
+		float version;//4
+		char name[20];//20
+		char comment[256];//256
+	};//283バイト
+#pragma pack()
+	PMDHeader header;
+	fread_s(&header, sizeof(header), sizeof(PMDHeader), 1, fp);
+	
+	fread_s(&_vertNum, sizeof(_vertNum), sizeof(uint32_t), 1, fp);
+#pragma pack(1)
+	struct PMDVertex {
+		float pos[3];//12
+		float normal[3];//12
+		float uv[2];//8
+		uint16_t boneNo[2];//4
+		uint8_t boneWeight;//1
+		uint8_t edgeFlg;//1
+	};//38バイト
+#pragma pack()
+	struct PMDVertex4 {
+		float pos[3];//12
+		float normal[3];//12
+		float uv[2];//8
+		uint16_t boneNo[2];//4
+		uint8_t boneWeight;//1
+		uint8_t edgeFlg;//1
 	};
+	auto s = sizeof(PMDVertex4);
+
+	//頂点データロード
+	_vertexData.resize(sizeof(PMDVertex)*_vertNum);
+	fread_s(_vertexData.data(), _vertexData.size(), _vertexData.size(), 1, fp);
+
+	//インデックスデータロード
+	fread(&_indexNum, sizeof(_indexNum), 1, fp);
+	_indexData.resize(_indexNum);
+	fread(_indexData.data(), sizeof(_indexData[0])*_indexData.size(), 1, fp);
+
+	unsigned int materialCount;
+	fread(&materialCount, sizeof(materialCount), 1, fp);
+#pragma pack(1)
+	struct PMDMaterial {
+		XMFLOAT4 diffuse;//ディフューズ色
+		float power;//スペキュラ乗数
+		XMFLOAT3 specular;//スペキュラ色
+		XMFLOAT3 ambient;//環境光
+		uint8_t toon;//トゥーン番号
+		uint8_t edge;//エッジフラグ
+		uint32_t indexNum;//インデックス数
+		char texturePath[20];//テクスチャパス(相対)
+	};
+#pragma pack()
+	vector<PMDMaterial> materials(materialCount);
+	_materials.resize(materialCount);
+	fread(materials.data(), sizeof(PMDMaterial), materialCount, fp);
+	_texturePaths.resize(materialCount);
+	for (int i = 0; i < materials.size(); ++i) {
+		_materials[i].diffuse = materials[i].diffuse;
+		_materials[i].power = materials[i].power;
+		_materials[i].specular = materials[i].specular;
+		_materials[i].ambient = materials[i].ambient;
+		string texpath=materials[i].texturePath;
+		if (texpath != "") {
+			auto sepStr = SeparateString(texpath);
+			for (auto& str : sepStr) {
+				auto ext = GetExtension(str);
+				auto pathStr = GetDirectoryFromPath(filepath) + str;
+				if (ext == "sph") {
+					_texturePaths[i].sphPath = pathStr;
+				}
+				else if (ext == "spa") {
+					_texturePaths[i].spaPath = pathStr;
+				}
+				else {
+					_texturePaths[i].texPath = pathStr;
+				}
+			}
+		}
+		if (materials[i].toon != 0xff) {
+			//トゥーンパスを得る
+			ostringstream oss;
+			oss << "toon/toon" << setw(2) << setfill('0') << static_cast<int>(materials[i].toon + 1) << ".bmp";
+			_texturePaths[i].toonPath = oss.str();
+		}
+		_materials[i].indicesNum = materials[i].indexNum;
+	}
+
+	uint16_t boneNum=0;//ボーン数
+	fread(&boneNum, sizeof(boneNum), 1, fp);
+#pragma pack(1)
+	struct PMDBone {
+		char boneName[20];
+		uint16_t parentBoneIdx;
+		uint16_t tailBone;
+		uint8_t type;
+		uint16_t ikBone;
+		XMFLOAT3 pos;
+	};
+#pragma pack()
+	vector<PMDBone> pmdbones(boneNum);
+	fread(pmdbones.data(), sizeof(PMDBone),boneNum, fp);
+
+	fclose(fp);
+
+	_boneMatrices.resize(pmdbones.size());
+	_boneTree.resize(pmdbones.size());
+	_boneAddressArray.resize(pmdbones.size());
+	for (int i = 0; i < pmdbones.size();++i) {
+		_boneTable[pmdbones[i].boneName] = 
+			BoneInfo(i,pmdbones[i].pos);
+		_boneMatrices[i] = XMMatrixIdentity();
+		if (pmdbones[i].parentBoneIdx != 0xffff) {
+			auto pidx = pmdbones[i].parentBoneIdx;
+			_boneTree[pidx].push_back(i);
+		}
+		_boneAddressArray[i] = &_boneTable[pmdbones[i].boneName];
+		string bname = pmdbones[i].boneName;
+		if (bname=="頭"){//bname.find("首") != std::string::npos) {
+			_eyeBoneIdxes.push_back(i);
+		}
+	}
+	return true;
+}
+
+void 
+PMDActor::RecursiveBoneTransform(int idx,const DirectX::XMMATRIX& mat) {
+	_boneMatrices[idx] *= mat;
+	for (auto child:_boneTree[idx]) {
+		RecursiveBoneTransform(child, _boneMatrices[idx]);
+	}
+}
+
+PMDActor::PMDActor(shared_ptr<Dx12Wrapper> dx ,const char* path):_dx(dx),_pos(0,0,0),_rotator(0,0,0)
+{
+	LoadFromPMD(path);
+	if (!CreateVertexBufferAndView()) {
+		return;
+	}
+	if (!CreateIndexBufferAndView()) {
+		return;
+	}
+	if (!CreateMaterialBuffer()) {
+		return;
+	}
+	if (!LoadTexture()) {
+		return;
+	}
+	if (!CreateMaterialBufferView()) {
+		return;
+	}
+	if (!CreateBoneBuffer()) {
+		return;
+	}
+
+
+
+
+	if (!CreateTransformBuffer()) {
+		return;
+	}
+	if (!CreateTransformBufferView()) {
+		return;
+	}
+}
+
+void 
+PMDActor::LoadVMDData(const char* vmdpath) {
+	FILE* fp = nullptr;
+	auto err = fopen_s(&fp,vmdpath,"rb");
+
+	//最初の50バイトは今のところ無意味なので飛ばす
+	fseek(fp, 50, SEEK_SET);
+
+	uint32_t keyframeNum=0;
+	fread(&keyframeNum, sizeof(keyframeNum), 1, fp);
+
+#pragma pack(1)
+	struct VMDKeyFrame {
+		char boneName[15];//ボーン名
+		uint32_t frameNo;//フレーム番号
+		XMFLOAT3 location;//オフセット
+		XMFLOAT4 quaternion;//クオータニオン
+		uint8_t bezier[64];//ベジェデータ
+	};
+#pragma pack()
+	vector<VMDKeyFrame> keyframes(keyframeNum);
+	fread(keyframes.data(), sizeof(VMDKeyFrame), keyframes.size(), fp);
+	fclose(fp);
+
+	_duration = 0;
+	//各ボーンの回転に適用
+	for (auto& keyframe : keyframes) {
+		std::string boneName=keyframe.boneName;
+		_keyframes[boneName].emplace_back(keyframe.frameNo,keyframe.quaternion,keyframe.location,
+			static_cast<float>(keyframe.bezier[3+15])/127.f,//P1.x
+			static_cast<float>(keyframe.bezier[7+15]) / 127.f,//P1.y
+			static_cast<float>(keyframe.bezier[11+15]) / 127.f,//P2.x
+			static_cast<float>(keyframe.bezier[15+15]) / 127.f );////P2.y
+		_duration=max(keyframe.frameNo,_duration);
+	}
+
+
+	//ボーン内の各キーフレームのソートを行う
+	//順序にはフレーム番号を用いる
+	for (auto& boneKeyFrame : _keyframes) {
+		auto& keyframeVector = boneKeyFrame.second;
+		sort(keyframeVector.begin(), keyframeVector.end(),
+			[](const KeyFrame& lval,const KeyFrame& rval) {
+			return lval.frameNo < rval.frameNo;
+			}
+		);
+	}
+
+	_lastTickCount = GetTickCount();
 
 }
 
-void
-PMDActor::LookAt(float x, float y, float z) {
-	_localMat = LookAtMatrix(XMLoadFloat3(&XMFLOAT3(x, y, z)), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
-}
-
-
-void
-PMDActor::SolveLookAt(const PMDIK& ik) {
-	//この関数に来た時点でノードはひとつしかなく、チェーンに入っているノード番号は
-	//IKのルートノードのものなので、このルートノードからターゲットに向かうベクトルを考えればよい
-	auto rootNode = _boneNodeAddressArray[ik.nodeIdxes[0]];
-	auto targetNode = _boneNodeAddressArray[ik.targetIdx];//!?
-
-	auto opos1 = XMLoadFloat3(&rootNode->startPos);
-	auto tpos1 = XMLoadFloat3(&targetNode->startPos);
-
-	auto opos2 = XMVector3Transform(opos1, _boneMatrices[ik.nodeIdxes[0]]);
-	auto tpos2 = XMVector3Transform(tpos1, _boneMatrices[ik.boneIdx]);
-
-	auto originVec = XMVectorSubtract(tpos1, opos1);
-	auto targetVec = XMVectorSubtract(tpos2, opos2);
-
-	originVec = XMVector3Normalize(originVec);
-	targetVec = XMVector3Normalize(targetVec);
-
-	XMMATRIX mat = XMMatrixTranslationFromVector(-opos2)*
-					LookAtMatrix(originVec, targetVec, XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0))*
-					XMMatrixTranslationFromVector(opos2);
-
-	//auto parent = _boneNodeAddressArray[ik.boneIdx]->parentBone;
-
-	_boneMatrices[ik.nodeIdxes[0]] = mat;// _boneMatrices[ik.boneIdx] * _boneMatrices[parent];
-	//_boneMatrices[ik.targetIdx] = _boneMatrices[parent];
-}
-
-void
-PMDActor::SolveCosineIK(const PMDIK& ik) {
-	vector<XMVECTOR> positions;//IK構成点を保存
-	std::array<float, 2> edgeLens;//IKのそれぞれのボーン間の距離を保存
-
-	//ターゲット(末端ボーンではなく、末端ボーンが近づく目標ボーンの座標を取得)
-	auto& targetNode = _boneNodeAddressArray[ik.boneIdx];
-	auto targetPos = XMVector3Transform(XMLoadFloat3(&targetNode->startPos), _boneMatrices[ik.boneIdx]);
-
-	//IKチェーンが逆順なので、逆に並ぶようにしている
-	//末端ボーン
-	auto endNode = _boneNodeAddressArray[ik.targetIdx];
-	positions.emplace_back(XMLoadFloat3(&endNode->startPos));
-	//中間及びルートボーン
-	for (auto& chainBoneIdx : ik.nodeIdxes) {
-		auto boneNode = _boneNodeAddressArray[chainBoneIdx];
-		positions.emplace_back(XMLoadFloat3(&boneNode->startPos));
+bool
+PMDActor::CreateBoneBuffer() {
+	if (_boneMatrices.empty()) {
+		return false;
 	}
-	//ちょっと分かりづらいと思ったので逆にしておきます。そうでもない人はそのまま
-	//計算してもらって構わないです。
-	reverse(positions.begin(), positions.end());
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto size=AligmentedValue(sizeof(XMMATRIX)*_boneMatrices.size(), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
+	auto result = _dx->Device()->CreateCommittedResource(
+		&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(_bonesBuff.ReleaseAndGetAddressOf()));
 
-	//元の長さを測っておく
-	edgeLens[0] = XMVector3Length(XMVectorSubtract(positions[1], positions[0])).m128_f32[0];
-	edgeLens[1] = XMVector3Length(XMVectorSubtract(positions[2], positions[1])).m128_f32[0];
-
-	//ルートボーン座標変換(逆順になっているため使用するインデックスに注意)
-	positions[0] = XMVector3Transform(positions[0], _boneMatrices[ik.nodeIdxes[1]]);
-	//真ん中はどうせ自動計算されるので計算しない
-	//先端ボーン
-	positions[2] = XMVector3Transform(positions[2], _boneMatrices[ik.boneIdx]);//ホンマはik.targetIdxだが…！？
-
-	//ルートから先端へのベクトルを作っておく
-	auto linearVec = XMVectorSubtract(positions[2], positions[0]);
-	float A = XMVector3Length(linearVec).m128_f32[0];
-	float B = edgeLens[0];
-	float C = edgeLens[1];
-
-	linearVec = XMVector3Normalize(linearVec);
-
-	//ルートから真ん中への角度計算
-	float theta1 = acosf((A*A + B * B - C * C) / (2 * A*B));
-
-	//真ん中からターゲットへの角度計算
-	float theta2 = acosf((B*B + C * C - A * A) / (2 * B*C));
-
-	//「軸」を求める
-	//もし真ん中が「ひざ」であった場合には強制的にX軸とする。
-	XMVECTOR axis;
-	if (find(_kneeIdxes.begin(), _kneeIdxes.end(), ik.nodeIdxes[0]) == _kneeIdxes.end()) {
-		auto vm = XMVector3Normalize(XMVectorSubtract(positions[2], positions[0]));
-		auto vt = XMVector3Normalize(XMVectorSubtract(targetPos, positions[0]));
-		axis = XMVector3Cross(vt, vm);
+	if (!CheckResult(result)) {
+		return false;
 	}
-	else {
-		auto right = XMFLOAT3(1, 0, 0);
-		axis = XMLoadFloat3(&right);
-	}
-
-	//注意点…IKチェーンは根っこに向かってから数えられるため1が根っこに近い
-	auto mat1 = XMMatrixTranslationFromVector(-positions[0]);
-	mat1 *= XMMatrixRotationAxis(axis,theta1);
-	mat1 *= XMMatrixTranslationFromVector(positions[0]);
 
 	
-	auto mat2 = XMMatrixTranslationFromVector(-positions[1]);
-	mat2 *= XMMatrixRotationAxis(axis,theta2-XM_PI);
-	mat2 *= XMMatrixTranslationFromVector(positions[1]);
+	result = _bonesBuff->Map(0, nullptr, (void**)&_mappedBoneMatrix);
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedBoneMatrix);
 
-	_boneMatrices[ik.nodeIdxes[1]] *= mat1;
-	_boneMatrices[ik.nodeIdxes[0]] = mat2 * _boneMatrices[ik.nodeIdxes[1]];
-	_boneMatrices[ik.targetIdx] = _boneMatrices[ik.nodeIdxes[0]];//直前の影響を受ける
-	//_boneMatrices[ik.nodeIdxes[1]] = _boneMatrices[ik.boneIdx];
-	//_boneMatrices[ik.nodeIdxes[0]] = _boneMatrices[ik.boneIdx];
-	//_boneMatrices[ik.targetIdx] *= _boneMatrices[ik.boneIdx];
+
+	return true;
 }
-//誤差の範囲内かどうかに使用する定数
-constexpr float epsilon = 0.0005f;
-void
-PMDActor::SolveCCDIK(const PMDIK& ik) {
-	//ターゲット
-	auto targetBoneNode = _boneNodeAddressArray[ik.boneIdx];
-	auto targetOriginPos = XMLoadFloat3(&targetBoneNode->startPos);
-
-	auto parentMat = _boneMatrices[_boneNodeAddressArray[ik.boneIdx]->ikParentBone];
-	XMVECTOR det;
-	auto invParentMat = XMMatrixInverse(&det, parentMat);
-	auto targetNextPos = XMVector3Transform(targetOriginPos, _boneMatrices[ik.boneIdx] * invParentMat);
-
-
-	//まずはIKの間にあるボーンの座標を入れておく(逆順注意)
-	std::vector<XMVECTOR> bonePositions;
-	//auto endPos = XMVector3Transform(
-	//	XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos),
-	//	//_boneMatrices[ik.targetIdx]);
-	//	XMMatrixIdentity());
-	//末端ノード
-	auto endPos = XMLoadFloat3(&_boneNodeAddressArray[ik.targetIdx]->startPos);
-	//中間ノード(ルートを含む)
-	for (auto& cidx : ik.nodeIdxes) {
-		//bonePositions.emplace_back(XMVector3Transform(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos),
-			//_boneMatrices[cidx] ));
-		bonePositions.push_back(XMLoadFloat3(&_boneNodeAddressArray[cidx]->startPos));
-	}
-
-	vector<XMMATRIX> mats(bonePositions.size());
-	fill(mats.begin(), mats.end(), XMMatrixIdentity());
-	//ちょっとよくわからないが、PMDエディタの6.8°が0.03になっており、これは180で割っただけの値である。
-	//つまりこれをラジアンとして使用するにはXM_PIを乗算しなければならない…と思われる。
-	auto ikLimit = ik.limit*XM_PI;
-	//ikに設定されている試行回数だけ繰り返す
-	for (int c = 0; c < ik.iterations; ++c) {
-		//ターゲットと末端がほぼ一致したら抜ける
-		if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
-			break;
-		}
-		//それぞれのボーンを遡りながら角度制限に引っ掛からないように曲げていく
-		for (int bidx = 0; bidx < bonePositions.size(); ++bidx) {
-			const auto& pos = bonePositions[bidx];
-
-			//まず現在のノードから末端までと、現在のノードからターゲットまでのベクトルを作る
-			auto vecToEnd = XMVectorSubtract(endPos, pos);
-			auto vecToTarget = XMVectorSubtract(targetNextPos, pos);
-			vecToEnd = XMVector3Normalize(vecToEnd);
-			vecToTarget = XMVector3Normalize(vecToTarget);
-
-			//ほぼ同じベクトルになってしまった場合は外積できないため次のボーンに引き渡す
-			if (XMVector3Length(XMVectorSubtract(vecToEnd, vecToTarget)).m128_f32[0] <= epsilon) {
-				continue;
-			}
-			//外積計算および角度計算
-			auto cross = XMVector3Normalize(XMVector3Cross(vecToEnd, vecToTarget));
-			float angle = XMVector3AngleBetweenVectors(vecToEnd, vecToTarget).m128_f32[0];
-			angle = min(angle,ikLimit);//回転限界補正
-			XMMATRIX rot = XMMatrixRotationAxis(cross, angle);//回転行列
-			//posを中心に回転
-			auto mat = XMMatrixTranslationFromVector(-pos)*
-				rot*
-				XMMatrixTranslationFromVector(pos);
-			mats[bidx] *= mat;//回転行列を保持しておく(乗算で回転重ね掛けを作っておく)
-			//対象となる点をすべて回転させる(現在の点から見て末端側を回転)
-			for (auto idx = bidx - 1; idx >= 0; --idx) {//自分を回転させる必要はない
-				bonePositions[idx] = XMVector3Transform(bonePositions[idx], mat);
-			}
-			endPos = XMVector3Transform(endPos, mat);
-			//もし正解に近くなってたらループを抜ける
-			if (XMVector3Length(XMVectorSubtract(endPos, targetNextPos)).m128_f32[0] <= epsilon) {
-				break;
-			}
-		}
-	}
-	int idx = 0;
-	for (auto& cidx : ik.nodeIdxes) {
-		_boneMatrices[cidx] = mats[idx];
-		++idx;
-	}
-	auto node = _boneNodeAddressArray[ik.nodeIdxes.back()];
-	RecursiveMatrixMultipy(node, parentMat, true);
-
-}
-
-float
-PMDActor::GetYFromXOnBezier(float x, const XMFLOAT2& a, const XMFLOAT2& b, uint8_t n) {
-	if (a.x == a.y&&b.x == b.y)return x;//計算不要
-	float t = x;
-	const float k0 = 1 + 3 * a.x - 3 * b.x;//t^3の係数
-	const float k1 = 3 * b.x - 6 * a.x;//t^2の係数
-	const float k2 = 3 * a.x;//tの係数
-
-
-
-	for (int i = 0; i < n; ++i) {
-		//f(t)求めまーす
-		auto ft = k0 * t*t*t + k1 * t*t + k2 * t - x;
-		//もし結果が0に近い(誤差の範囲内)なら打ち切り
-		if (ft <= epsilon && ft >= -epsilon)break;
-
-		t -= ft / 2;
-	}
-	//既に求めたいtは求めているのでyを計算する
-	auto r = 1 - t;
-	return t * t*t + 3 * t*t*r*b.y + 3 * t*r*r*a.y;
-}
-
-void*
-PMDActor::Transform::operator new(size_t size) {
-	return _aligned_malloc(size, 16);
-}
-
-void
-PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat, bool flg) {
-	_boneMatrices[node->boneIdx] *= mat;
-	for (auto& cnode : node->children) {
-		RecursiveMatrixMultipy(cnode, _boneMatrices[node->boneIdx]);
-	}
-}
-
-
-PMDActor::PMDActor(const char* filepath, PMDRenderer& renderer) :
-	_renderer(renderer),
-	_dx12(renderer._dx12),
-	_angle(0.0f)
-{
-	_transform.world = XMMatrixIdentity();
-	LoadPMDFile(filepath);
-	CreateTransformView();
-	CreateMaterialData();
-	CreateMaterialAndTextureView();
-}
-
 
 PMDActor::~PMDActor()
 {
 }
 
-void
-PMDActor::LoadVMDFile(const char* filepath, const char* name) {
-	auto fp = fopen(filepath, "rb");
-	fseek(fp, 50, SEEK_SET);//最初の50バイトは飛ばしてOK
-	unsigned int keyframeNum = 0;
-	fread(&keyframeNum, sizeof(keyframeNum), 1, fp);
+std::vector<uint8_t>& 
+PMDActor::GetVertexData() {
+	return _vertexData;
+}
+std::vector<Material>& 
+PMDActor::Materials() {
+	return _materials;
+}
 
-	struct VMDKeyFrame {
-		char boneName[15]; // ボーン名
-		unsigned int frameNo; // フレーム番号(読込時は現在のフレーム位置を0とした相対位置)
-		XMFLOAT3 location; // 位置
-		XMFLOAT4 quaternion; // Quaternion // 回転
-		unsigned char bezier[64]; // [4][4][4]  ベジェ補完パラメータ
-	};
-	vector<VMDKeyFrame> keyframes(keyframeNum);
-	for (auto& keyframe : keyframes) {
-		fread(keyframe.boneName, sizeof(keyframe.boneName), 1, fp);//ボーン名
-		fread(&keyframe.frameNo, sizeof(keyframe.frameNo) +//フレーム番号
-			sizeof(keyframe.location) +//位置(IKのときに使用予定)
-			sizeof(keyframe.quaternion) +//クオータニオン
-			sizeof(keyframe.bezier), 1, fp);//補間ベジェデータ
+std::vector<MultiTexturePath>& 
+PMDActor::GetTexturePaths() {
+	return _texturePaths;
+}
+
+void 
+PMDActor::Move(float x, float y, float z) {
+	_pos.x += x;
+	_pos.y += y;
+	_pos.z += z;
+}
+void 
+PMDActor::Rotate(float x, float y, float z) {
+	_rotator.x += x;
+	_rotator.y += y;
+	_rotator.z += z;
+}
+
+const XMFLOAT3& 
+PMDActor::GetPosition()const {
+	return _pos;
+}
+const XMFLOAT3& 
+PMDActor::GetRotate()const {
+	return _rotator;
+}
+
+//バッファ作る関数
+bool 
+PMDActor::CreateVertexBufferAndView() {
+	if (_vertexData.empty())return false;
+
+	//↑の情報をGPUから使用するためにまず
+//頂点バッファを作る
+	D3D12_HEAP_PROPERTIES heapProp =
+		CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	D3D12_RESOURCE_DESC resDesc =
+		CD3DX12_RESOURCE_DESC::Buffer(_vertexData.size());
+
+
+	auto result = _dx->Device()->CreateCommittedResource(&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(_vertexBuff.ReleaseAndGetAddressOf()));
+
+	if (!CheckResult(result)) {
+		return false;
 	}
 
-#pragma pack(1)
-	//表情データ(頂点モーフデータ)
-	struct VMDMorph {
-		char name[15];//名前(パディングしてしまう)
-		uint32_t frameNo;//フレーム番号
-		float weight;//ウェイト(0.0f～1.0f)
-	};//全部で23バイトなのでpragmapackで読む
-#pragma pack()
-	uint32_t morphCount = 0;
-	fread(&morphCount, sizeof(morphCount), 1, fp);
-	vector<VMDMorph> morphs(morphCount);
-	fread(morphs.data(), sizeof(VMDMorph), morphCount, fp);
+	//頂点データを頂点バッファにコピー
+	uint8_t* mappedVertices;
+	result = _vertexBuff->Map(0, nullptr, (void**)&mappedVertices);
+	std::copy(_vertexData.begin(), _vertexData.end(), mappedVertices);
+	//終わったらアンマップ
+	_vertexBuff->Unmap(0, nullptr);
 
-#pragma pack(1)
-	//カメラ
-	struct VMDCamera { 
-		uint32_t frameNo; // フレーム番号
-		float distance; // 距離
-		XMFLOAT3 pos; // 座標
-		XMFLOAT3 eulerAngle; // オイラー角
-		uint8_t Interpolation[24]; // 補完
-		uint32_t fov; // 視界角
-		uint8_t persFlg; // パースフラグON/OFF
-	};//61バイト(これもpragma pack(1)の必要あり)
-#pragma pack()
-	uint32_t vmdCameraCount = 0;
-	fread(&vmdCameraCount, sizeof(vmdCameraCount), 1, fp);
-	vector<VMDCamera> cameraData(vmdCameraCount);
-	fread(cameraData.data(), sizeof(VMDCamera), vmdCameraCount, fp);
+	_vbView.BufferLocation = _vertexBuff->GetGPUVirtualAddress();//アドレス
+	_vbView.SizeInBytes = _vertexData.size();
+	_vbView.StrideInBytes = 38;
 
-	// ライト照明データ
-	struct VMDLight {
-		uint32_t frameNo; // フレーム番号
-		XMFLOAT3 rgb; //ライト色
-		XMFLOAT3 vec; //光線ベクトル(平行光線)
-	};
 
-	uint32_t vmdLightCount = 0;
-	fread(&vmdLightCount, sizeof(vmdLightCount), 1, fp);
-	vector<VMDLight> lights(vmdLightCount);
-	fread(lights.data(), sizeof(VMDLight), vmdLightCount, fp);
+	_vertexData.clear();
+	return true;
+}
+bool 
+PMDActor::CreateIndexBufferAndView() {
+	if (_indexData.empty()) {
+		return false;
+	}
 
-#pragma pack(1)
-	// セルフ影データ
-	struct VMDSelfShadow { 
-		uint32_t frameNo; // フレーム番号
-		uint8_t mode; //影モード(0:影なし、1:モード１、2:モード２)
-		float distance; //距離
-	};
-#pragma pack()
-	uint32_t selfShadowCount = 0;
-	fread(&selfShadowCount, sizeof(selfShadowCount), 1, fp);
-	vector<VMDSelfShadow> selfShadowData(selfShadowCount);
-	fread(selfShadowData.data(), sizeof(VMDSelfShadow), selfShadowCount,fp);
+	D3D12_HEAP_PROPERTIES heapProp =
+		CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
-	//IKオンオフ切り替わり数
-	uint32_t ikSwitchCount=0;
-	fread(&ikSwitchCount, sizeof(ikSwitchCount), 1, fp);
-	//IK切り替えのデータ構造は少しだけ特殊で、いくつ切り替えようが
-	//そのキーフレームは消費されます。その中で切り替える可能性のある
-	//IKの名前とそのフラグがすべて登録されている状態です。
+	D3D12_RESOURCE_DESC resDesc = 
+		CD3DX12_RESOURCE_DESC::Buffer(sizeof(_indexData[0])*_indexData.size());
 	
-	//ここからは気を遣って読み込みます。キーフレームごとのデータであり
-	//IKボーン(名前で検索)ごとにオン、オフフラグを持っているというデータであるとして
-	//構造体を作っていきましょう。
-	_ikEnableData.resize(ikSwitchCount);
-	for (auto& ikEnable : _ikEnableData) {
-		//キーフレーム情報なのでまずはフレーム番号読み込み
-		fread(&ikEnable.frameNo, sizeof(ikEnable.frameNo), 1, fp);
-		//次に可視フラグがありますがこれは使用しないので1バイトシークでも構いません
-		uint8_t visibleFlg = 0;
-		fread(&visibleFlg, sizeof(visibleFlg), 1, fp);
-		//対象ボーン数読み込み
-		uint32_t ikBoneCount = 0;
-		fread(&ikBoneCount, sizeof(ikBoneCount), 1, fp);
-		//ループしつつ名前とON/OFF情報を取得
-		for (int i = 0; i < ikBoneCount; ++i) {
-			char ikBoneName[20];
-			fread(ikBoneName, _countof(ikBoneName), 1, fp);
-			uint8_t flg = 0;
-			fread(&flg, sizeof(flg), 1, fp);
-			ikEnable.ikEnableTable[ikBoneName] = flg;
-		}
-	}
-	fclose(fp);
-
-	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
-	for (auto& f : keyframes) {
-		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion), f.location,
-			XMFLOAT2((float)f.bezier[3] / 127.0f, (float)f.bezier[7] / 127.0f),
-			XMFLOAT2((float)f.bezier[11] / 127.0f, (float)f.bezier[15] / 127.0f)));
-		_duration = std::max<unsigned int>(_duration, f.frameNo);
-	}
-
-	for (auto& motion : _motiondata) {
-		sort(motion.second.begin(), motion.second.end(),
-			[](const KeyFrame& lval, const KeyFrame& rval) {
-			return lval.frameNo < rval.frameNo;
-		});
-	}
-
-	for (auto& bonemotion : _motiondata) {
-		auto itBoneNode = _boneNodeTable.find(bonemotion.first);
-		if (itBoneNode == _boneNodeTable.end()) {
-			continue;
-		}
-		auto& node = itBoneNode->second;
-		auto& pos = node.startPos;
-		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
-			XMMatrixRotationQuaternion(bonemotion.second[0].quaternion)*
-			XMMatrixTranslation(pos.x, pos.y, pos.z);
-		_boneMatrices[node.boneIdx] = mat;
-	}
-	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
-	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
-
-}
-
-void
-PMDActor::PlayAnimation() {
-	_startTime = timeGetTime();
-}
-void
-PMDActor::MotionUpdate() {
-
-	auto elapsedTime = timeGetTime() - _startTime;//経過時間を測る
-	unsigned int frameNo = 30 * (elapsedTime / 1000.0f);
-	if (frameNo > _duration) {
-		_startTime = timeGetTime();
-		frameNo = 0;
-	}
-
-	//行列情報クリア(してないと前フレームのポーズが重ね掛けされてモデルが壊れる)
-	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
-
-	//モーションデータ更新
-	for (auto& bonemotion : _motiondata) {
-		auto& boneName = bonemotion.first;
-		auto itBoneNode = _boneNodeTable.find(boneName);
-		if (itBoneNode == _boneNodeTable.end()) {
-			continue;
-		}
-		auto node = itBoneNode->second;
-
-
-		//合致するものを探す
-		auto keyframes = bonemotion.second;
-
-		auto rit = find_if(keyframes.rbegin(), keyframes.rend(), [frameNo](const KeyFrame& keyframe) {
-			return keyframe.frameNo <= frameNo;
-		});
-		if (rit == keyframes.rend())continue;//合致するものがなければ飛ばす
-		XMMATRIX rotation = XMMatrixIdentity();
-		XMVECTOR offset = XMLoadFloat3(&rit->offset);
-		auto it = rit.base();
-		if (it != keyframes.end()) {
-			auto t = static_cast<float>(frameNo - rit->frameNo) /
-				static_cast<float>(it->frameNo - rit->frameNo);
-			t = GetYFromXOnBezier(t, it->p1, it->p2, 12);
-			rotation = XMMatrixRotationQuaternion(
-				XMQuaternionSlerp(rit->quaternion, it->quaternion, t)
-			);
-			offset = XMVectorLerp(offset, XMLoadFloat3(&it->offset), t);
-		}
-		else {
-			rotation = XMMatrixRotationQuaternion(rit->quaternion);
-		}
-
-		auto& pos = node.startPos;
-		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*//原点に戻し
-			rotation*//回転
-			XMMatrixTranslation(pos.x, pos.y, pos.z);//元の座標に戻す
-		_boneMatrices[node.boneIdx] = mat * XMMatrixTranslationFromVector(offset);
-	}
-	RecursiveMatrixMultipy(&_boneNodeTable["センター"], XMMatrixIdentity());
-
-	IKSolve(frameNo);
-
-	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
-}
-
-void
-PMDActor::IKSolve(int frameNo) {
-	//いつもの逆から検索
-	auto it=find_if(_ikEnableData.rbegin(),_ikEnableData.rend(),
-		[frameNo](const VMDIKEnable& ikenable) {
-			return ikenable.frameNo <= frameNo;
-		});
-	//まずはIKのターゲットボーンを動かす
-	for (auto& ik : _ikData) {//IK解決のためのループ
-		if (it != _ikEnableData.rend()) {
-			auto ikEnableIt = it->ikEnableTable.find(_boneNameArray[ik.boneIdx]);
-			if (ikEnableIt != it->ikEnableTable.end()) {
-				if (!ikEnableIt->second) {//もしOFFなら打ち切ります
-					continue;
-				}
-			}
-		}
-		auto childrenNodesCount = ik.nodeIdxes.size();
-		switch (childrenNodesCount) {
-		case 0://間のボーン数が0(ありえない)
-			assert(0);
-			continue;
-		case 1://間のボーン数が1のときはLookAt
-			SolveLookAt(ik);
-			break;
-		case 2://間のボーン数が2のときは余弦定理IK
-			SolveCosineIK(ik);
-			break;
-		default://3以上の時はCCD-IK
-			SolveCCDIK(ik);
-		}
-	}
-}
-
-HRESULT
-PMDActor::LoadPMDFile(const char* path) {
-	//PMDヘッダ構造体
-	struct PMDHeader {
-		float version; //例：00 00 80 3F == 1.00
-		char model_name[20];//モデル名
-		char comment[256];//モデルコメント
-	};
-	char signature[3];
-	PMDHeader pmdheader = {};
-
-	string strModelPath = path;
-
-	auto fp = fopen(strModelPath.c_str(), "rb");
-	if (fp == nullptr) {
-		//エラー処理
-		assert(0);
-		return ERROR_FILE_NOT_FOUND;
-	}
-	fread(signature, sizeof(signature), 1, fp);
-	fread(&pmdheader, sizeof(pmdheader), 1, fp);
-
-	unsigned int vertNum;//頂点数
-	fread(&vertNum, sizeof(vertNum), 1, fp);
-
-
-#pragma pack(1)//ここから1バイトパッキング…アライメントは発生しない
-	//PMDマテリアル構造体
-	struct PMDMaterial {
-		XMFLOAT3 diffuse; //ディフューズ色
-		float alpha; // ディフューズα
-		float specularity;//スペキュラの強さ(乗算値)
-		XMFLOAT3 specular; //スペキュラ色
-		XMFLOAT3 ambient; //アンビエント色
-		unsigned char toonIdx; //トゥーン番号(後述)
-		unsigned char edgeFlg;//マテリアル毎の輪郭線フラグ
-		//2バイトのパディングが発生！！
-		unsigned int indicesNum; //このマテリアルが割り当たるインデックス数
-		char texFilePath[20]; //テクスチャファイル名(プラスアルファ…後述)
-	};//70バイトのはず…でもパディングが発生するため72バイト
-#pragma pack()//1バイトパッキング解除
-
-	constexpr unsigned int pmdvertex_size = 38;//頂点1つあたりのサイズ
-	std::vector<unsigned char> vertices(vertNum*pmdvertex_size);//バッファ確保
-	fread(vertices.data(), vertices.size(), 1, fp);//一気に読み込み
-
-	unsigned int indicesNum;//インデックス数
-	fread(&indicesNum, sizeof(indicesNum), 1, fp);//
-
-	//UPLOAD(確保は可能)
-	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	auto result = _dx->Device()->CreateCommittedResource(&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(_vb.ReleaseAndGetAddressOf()));
+		IID_PPV_ARGS(_indexBuff.ReleaseAndGetAddressOf()));
 
-	unsigned char* vertMap = nullptr;
-	result = _vb->Map(0, nullptr, (void**)&vertMap);
-	std::copy(vertices.begin(), vertices.end(), vertMap);
-	_vb->Unmap(0, nullptr);
+	if (!CheckResult(result)) {
+		return false;
+	}
 
-
-	_vbView.BufferLocation = _vb->GetGPUVirtualAddress();//バッファの仮想アドレス
-	_vbView.SizeInBytes = vertices.size();//全バイト数
-	_vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
-
-	std::vector<unsigned short> indices(indicesNum);
-	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);//一気に読み込み
-
-
-	//設定は、バッファのサイズ以外頂点バッファの設定を使いまわして
-	//OKだと思います。
-	result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(_ib.ReleaseAndGetAddressOf()));
-
-	//作ったバッファにインデックスデータをコピー
-	unsigned short* mappedIdx = nullptr;
-	_ib->Map(0, nullptr, (void**)&mappedIdx);
-	std::copy(indices.begin(), indices.end(), mappedIdx);
-	_ib->Unmap(0, nullptr);
-
-
-	//インデックスバッファビューを作成
-	_ibView.BufferLocation = _ib->GetGPUVirtualAddress();
+	_ibView.BufferLocation = _indexBuff->GetGPUVirtualAddress();
 	_ibView.Format = DXGI_FORMAT_R16_UINT;
-	_ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
+	_ibView.SizeInBytes = resDesc.Width;
 
-	unsigned int materialNum;
-	fread(&materialNum, sizeof(materialNum), 1, fp);
-	_materials.resize(materialNum);
-	_textureResources.resize(materialNum);
-	_sphResources.resize(materialNum);
-	_spaResources.resize(materialNum);
-	_toonResources.resize(materialNum);
-
-	std::vector<PMDMaterial> pmdMaterials(materialNum);
-	fread(pmdMaterials.data(), pmdMaterials.size() * sizeof(PMDMaterial), 1, fp);
-	//コピー
-	for (int i = 0; i < pmdMaterials.size(); ++i) {
-		_materials[i].indicesNum = pmdMaterials[i].indicesNum;
-		_materials[i].material.diffuse = pmdMaterials[i].diffuse;
-		_materials[i].material.alpha = pmdMaterials[i].alpha;
-		_materials[i].material.specular = pmdMaterials[i].specular;
-		_materials[i].material.specularity = pmdMaterials[i].specularity;
-		_materials[i].material.ambient = pmdMaterials[i].ambient;
-		_materials[i].additional.toonIdx = pmdMaterials[i].toonIdx;
-	}
-
-	for (int i = 0; i < pmdMaterials.size(); ++i) {
-		//トゥーンリソースの読み込み
-		char toonFilePath[32];
-		sprintf(toonFilePath, "toon/toon%02d.bmp", pmdMaterials[i].toonIdx + 1);
-		_toonResources[i] = _dx12.GetTextureByPath(toonFilePath);
-
-		if (strlen(pmdMaterials[i].texFilePath) == 0) {
-			_textureResources[i] = nullptr;
-			continue;
-		}
-
-		string texFileName = pmdMaterials[i].texFilePath;
-		string sphFileName = "";
-		string spaFileName = "";
-		if (count(texFileName.begin(), texFileName.end(), '*') > 0) {//スプリッタがある
-			auto namepair = SplitFileName(texFileName);
-			if (GetExtension(namepair.first) == "sph") {
-				texFileName = namepair.second;
-				sphFileName = namepair.first;
-			}
-			else if (GetExtension(namepair.first) == "spa") {
-				texFileName = namepair.second;
-				spaFileName = namepair.first;
-			}
-			else {
-				texFileName = namepair.first;
-				if (GetExtension(namepair.second) == "sph") {
-					sphFileName = namepair.second;
-				}
-				else if (GetExtension(namepair.second) == "spa") {
-					spaFileName = namepair.second;
-				}
-			}
-		}
-		else {
-			if (GetExtension(pmdMaterials[i].texFilePath) == "sph") {
-				sphFileName = pmdMaterials[i].texFilePath;
-				texFileName = "";
-			}
-			else if (GetExtension(pmdMaterials[i].texFilePath) == "spa") {
-				spaFileName = pmdMaterials[i].texFilePath;
-				texFileName = "";
-			}
-			else {
-				texFileName = pmdMaterials[i].texFilePath;
-			}
-		}
-		//モデルとテクスチャパスからアプリケーションからのテクスチャパスを得る
-		if (texFileName != "") {
-			auto texFilePath = GetTexturePathFromModelAndTexPath(strModelPath, texFileName.c_str());
-			_textureResources[i] = _dx12.GetTextureByPath(texFilePath.c_str());
-		}
-		if (sphFileName != "") {
-			auto sphFilePath = GetTexturePathFromModelAndTexPath(strModelPath, sphFileName.c_str());
-			_sphResources[i] = _dx12.GetTextureByPath(sphFilePath.c_str());
-		}
-		if (spaFileName != "") {
-			auto spaFilePath = GetTexturePathFromModelAndTexPath(strModelPath, spaFileName.c_str());
-			_spaResources[i] = _dx12.GetTextureByPath(spaFilePath.c_str());
-		}
-	}
-
-	unsigned short boneNum = 0;
-	fread(&boneNum, sizeof(boneNum), 1, fp);
-#pragma pack(1)
-	//読み込み用ボーン構造体
-	struct Bone {
-		char boneName[20];//ボーン名
-		unsigned short parentNo;//親ボーン番号
-		unsigned short nextNo;//先端のボーン番号
-		unsigned char type;//ボーン種別
-		unsigned short ikBoneNo;//IKボーン番号
-		XMFLOAT3 pos;//ボーンの基準点座標
-	};
-#pragma pack()
-	vector<Bone> pmdBones(boneNum);
-	fread(pmdBones.data(), sizeof(Bone), boneNum, fp);
-
-
-	uint16_t ikNum = 0;
-	fread(&ikNum, sizeof(ikNum), 1, fp);
-
-	_ikData.resize(ikNum);
-	for (auto& ik : _ikData) {
-		fread(&ik.boneIdx, sizeof(ik.boneIdx), 1, fp);
-		fread(&ik.targetIdx, sizeof(ik.targetIdx), 1, fp);
-		uint8_t chainLen = 0;
-		fread(&chainLen, sizeof(chainLen), 1, fp);
-		ik.nodeIdxes.resize(chainLen);
-		fread(&ik.iterations, sizeof(ik.iterations), 1, fp);
-		fread(&ik.limit, sizeof(ik.limit), 1, fp);
-		if (chainLen == 0)continue;//間ノード数が0ならばここで終わり
-		fread(ik.nodeIdxes.data(), sizeof(ik.nodeIdxes[0]), chainLen, fp);
-	}
-
-	fclose(fp);
-
-	//読み込み後の処理
-
-	_boneNameArray.resize(pmdBones.size());
-	_boneNodeAddressArray.resize(pmdBones.size());
-	//ボーン情報構築
-	//インデックスと名前の対応関係構築のために後で使う
-	//ボーンノードマップを作る
-	_kneeIdxes.clear();
-	for (int idx = 0; idx < pmdBones.size(); ++idx) {
-		auto& pb = pmdBones[idx];
-		auto& node = _boneNodeTable[pb.boneName];
-		node.boneIdx = idx;
-		node.startPos = pb.pos;
-		node.boneType = pb.type;
-		node.parentBone = pb.parentNo;
-		node.ikParentBone = pb.ikBoneNo;
-		//インデックス検索がしやすいように
-		_boneNameArray[idx] = pb.boneName;
-		_boneNodeAddressArray[idx] = &node;
-		string boneName = pb.boneName;
-		if (boneName.find("ひざ") != std::string::npos) {
-			_kneeIdxes.emplace_back(idx);
-		}
-	}
-	//ツリー親子関係を構築する
-	for (auto& pb : pmdBones) {
-		//親インデックスをチェック(あり得ない番号なら飛ばす)
-		if (pb.parentNo >= pmdBones.size()) {
-			continue;
-		}
-		auto parentName = _boneNameArray[pb.parentNo];
-		_boneNodeTable[parentName].children.emplace_back(&_boneNodeTable[pb.boneName]);
-	}
-
-	//ボーン構築
-	_boneMatrices.resize(pmdBones.size());
-	//ボーンをすべて初期化する。
-	std::fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
-
-
-
-	//IKデバッグ用
-	auto getNameFromIdx = [&](uint16_t idx)->string {
-		auto it = find_if(_boneNodeTable.begin(), _boneNodeTable.end(), [idx](const pair<string, BoneNode>& obj) {
-			return obj.second.boneIdx == idx;
-		});
-		if (it != _boneNodeTable.end()) {
-			return it->first;
-		}
-		else {
-			return "";
-		}
-	};
-	for (auto& ik : _ikData) {
-		std::ostringstream oss;
-		oss << "IKボーン番号=" << ik.boneIdx << ":" << getNameFromIdx(ik.boneIdx) << endl;
-		for (auto& node : ik.nodeIdxes) {
-			oss << "\tノードボーン=" << node << ":" << getNameFromIdx(node) << endl;
-		}
-		OutputDebugString(oss.str().c_str());
-	}
+	uint16_t* mappedIndices = nullptr;
+	result = _indexBuff->Map(0, nullptr, (void**)&mappedIndices);
+	CheckResult(result);
+	copy(_indexData.begin(), _indexData.end(), mappedIndices);
+	_indexBuff->Unmap(0, nullptr);
+	_indexData.clear();
+	return true;
 }
 
-HRESULT
-PMDActor::CreateTransformView() {
-	//GPUバッファ作成
-	auto buffSize = sizeof(XMMATRIX)*(1 + _boneMatrices.size());
-	buffSize = (buffSize + 0xff)&~0xff;
-
-	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffSize),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf())
-	);
-	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
-	}
-
-	//マップとコピー
-	result = _transformBuff->Map(0, nullptr, (void**)&_mappedMatrices);
-	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
-	}
-	_mappedMatrices[0] = _transform.world;
-	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedMatrices + 1);
-
-	//ビューの作成
-	D3D12_DESCRIPTOR_HEAP_DESC transformDescHeapDesc = {};
-	transformDescHeapDesc.NumDescriptors = 1;//とりあえずワールドひとつ
-	transformDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	transformDescHeapDesc.NodeMask = 0;
-
-	transformDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
-	result = _dx12.Device()->CreateDescriptorHeap(&transformDescHeapDesc, IID_PPV_ARGS(_transformHeap.ReleaseAndGetAddressOf()));//生成
-	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
-	}
-
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = buffSize;
-	_dx12.Device()->CreateConstantBufferView(&cbvDesc, _transformHeap->GetCPUDescriptorHandleForHeapStart());
-
-	return S_OK;
+unsigned int 
+PMDActor::GetMaterialNum()const {
+	return _materials.size();
 }
 
-HRESULT
-PMDActor::CreateMaterialData() {
-	//マテリアルバッファを作成
-	auto materialBuffSize = sizeof(MaterialForHlsl);
-	materialBuffSize = (materialBuffSize + 0xff)&~0xff;
-	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+bool 
+PMDActor::CreateMaterialBuffer() {
+	if (_materials.empty()) {
+		return false;
+	}
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	auto& materials = _materials;
+	struct MaterialForBuffer {
+		DirectX::XMFLOAT4 diffuse;
+		float power;
+		DirectX::XMFLOAT3 specular;
+		DirectX::XMFLOAT3 ambient;
+	};
+	D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(AligmentedValue(sizeof(MaterialForBuffer),
+		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)*materials.size());
+
+	auto result = _dx->Device()->CreateCommittedResource(&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize*_materials.size()),//勿体ないけど仕方ないですね
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(_materialBuff.ReleaseAndGetAddressOf())
-	);
+		IID_PPV_ARGS(_materialBuff.ReleaseAndGetAddressOf()));
+
+	assert(SUCCEEDED(result));
 	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
+		return false;
+	}
+	uint8_t* mappedMaterial = nullptr;
+	result = _materialBuff->Map(0, nullptr, (void**)&mappedMaterial);
+	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return false;
 	}
 
-	//マップマテリアルにコピー
-	char* mapMaterial = nullptr;
-	result = _materialBuff->Map(0, nullptr, (void**)&mapMaterial);
-	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
+	for (auto& material : materials) {
+		MaterialForBuffer* pMFB = (MaterialForBuffer*)mappedMaterial;
+
+		pMFB->diffuse = material.diffuse;
+		pMFB->power = material.power;
+		pMFB->specular = material.specular;
+		pMFB->ambient = material.ambient;
+		mappedMaterial += AligmentedValue(sizeof(MaterialForBuffer), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	}
-	for (auto& m : _materials) {
-		*((MaterialForHlsl*)mapMaterial) = m.material;//データコピー
-		mapMaterial += materialBuffSize;//次のアライメント位置まで進める
-	}
+
 	_materialBuff->Unmap(0, nullptr);
-
-	return S_OK;
-
+	//_materials.clear();
+	return true;
 }
-
-
-HRESULT
-PMDActor::CreateMaterialAndTextureView() {
-	D3D12_DESCRIPTOR_HEAP_DESC materialDescHeapDesc = {};
-	materialDescHeapDesc.NumDescriptors = _materials.size() * 5;//マテリアル数ぶん(定数1つ、テクスチャ3つ)
-	materialDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	materialDescHeapDesc.NodeMask = 0;
-
-	materialDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;//デスクリプタヒープ種別
-	auto result = _dx12.Device()->CreateDescriptorHeap(&materialDescHeapDesc, IID_PPV_ARGS(_materialHeap.ReleaseAndGetAddressOf()));//生成
+//テクスチャロード
+bool 
+PMDActor::LoadTexture() {
+	bool ret = true;
+	_texBuff.resize(_texturePaths.size());
+	for (int i = 0; i < _texturePaths.size();++i) {
+		if (_texturePaths[i].texPath != "") {
+			ret = _dx->LoadPictureFromFile(WStringFromString(_texturePaths[i].texPath), _texBuff[i].tex);
+			if (!ret)return ret;
+		}
+		if (_texturePaths[i].sphPath != "") {
+			ret = _dx->LoadPictureFromFile(WStringFromString(_texturePaths[i].sphPath), _texBuff[i].sph);
+			if (!ret)return ret;
+		}
+		if (_texturePaths[i].spaPath != "") {
+			ret = _dx->LoadPictureFromFile(WStringFromString(_texturePaths[i].spaPath), _texBuff[i].spa);
+			if (!ret)return ret;
+		}
+		if (_texturePaths[i].toonPath != "") {
+			ret = _dx->LoadPictureFromFile(WStringFromString(_texturePaths[i].toonPath), _texBuff[i].toon);
+			if (!ret)return ret;
+		}
+	}
+	return true;
+}
+//マテリアルバッファビュー
+bool 
+PMDActor::CreateMaterialBufferView() {
+	auto& materials = _materials;
+	auto dev = _dx->Device();
+	//マテリアルバッファビューの作成
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = materials.size() * 5;//マテリアルとテクスチャとSPHとSPAとトゥーンで5つ
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	auto result = dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(_materialHeap.ReleaseAndGetAddressOf()));
+	assert(SUCCEEDED(result));
 	if (FAILED(result)) {
-		assert(SUCCEEDED(result));
-		return result;
+		return false;
 	}
-	auto materialBuffSize = sizeof(MaterialForHlsl);
-	materialBuffSize = (materialBuffSize + 0xff)&~0xff;
-	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-	matCBVDesc.BufferLocation = _materialBuff->GetGPUVirtualAddress();
-	matCBVDesc.SizeInBytes = materialBuffSize;
+	D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
+	viewDesc.BufferLocation = _materialBuff->GetGPUVirtualAddress();
+	viewDesc.SizeInBytes = AligmentedValue(sizeof(materials[0]), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	auto handle = _materialHeap->GetCPUDescriptorHandleForHeapStart();
+	auto heapStride = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	auto buffStride = AligmentedValue(sizeof(materials[0]), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	for (int i = 0; i < materials.size(); ++i) {
+		//マテリアル用
+		dev->CreateConstantBufferView(&viewDesc, handle);
+		handle.ptr += heapStride;
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;//後述
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = 1;//ミップマップは使用しないので1
-	CD3DX12_CPU_DESCRIPTOR_HANDLE matDescHeapH(_materialHeap->GetCPUDescriptorHandleForHeapStart());
-	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for (int i = 0; i < _materials.size(); ++i) {
-		//マテリアル固定バッファビュー
-		_dx12.Device()->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
-		matDescHeapH.ptr += incSize;
-		matCBVDesc.BufferLocation += materialBuffSize;
-		if (_textureResources[i] == nullptr) {
-			srvDesc.Format = _renderer._whiteTex->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_renderer._whiteTex.Get(), &srvDesc, matDescHeapH);
+		//テクスチャ用
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		///それぞれのテクスチャビューを作る
+		auto& multiTex = _texBuff[i];
+		//通常テクスチャ
+		if (multiTex.tex.Get() != nullptr) {
+			auto desc = multiTex.tex.Get()->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(multiTex.tex.Get(), &srvDesc, handle);
 		}
 		else {
-			srvDesc.Format = _textureResources[i]->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_textureResources[i].Get(), &srvDesc, matDescHeapH);
+			auto desc = _dx->WhiteTexture()->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(_dx->WhiteTexture().Get(), &srvDesc, handle);
 		}
-		matDescHeapH.Offset(incSize);
-
-		if (_sphResources[i] == nullptr) {
-			srvDesc.Format = _renderer._whiteTex->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_renderer._whiteTex.Get(), &srvDesc, matDescHeapH);
-		}
-		else {
-			srvDesc.Format = _sphResources[i]->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_sphResources[i].Get(), &srvDesc, matDescHeapH);
-		}
-		matDescHeapH.ptr += incSize;
-
-		if (_spaResources[i] == nullptr) {
-			srvDesc.Format = _renderer._blackTex->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_renderer._blackTex.Get(), &srvDesc, matDescHeapH);
+		handle.ptr += heapStride;
+		//SPHテクスチャ
+		if (multiTex.sph.Get() != nullptr) {
+			auto desc = multiTex.sph->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(multiTex.sph.Get(), &srvDesc, handle);
 		}
 		else {
-			srvDesc.Format = _spaResources[i]->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_spaResources[i].Get(), &srvDesc, matDescHeapH);
+			auto desc = _dx->WhiteTexture()->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(_dx->WhiteTexture().Get(), &srvDesc, handle);
 		}
-		matDescHeapH.ptr += incSize;
-
-
-		if (_toonResources[i] == nullptr) {
-			srvDesc.Format = _renderer._gradTex->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_renderer._gradTex.Get(), &srvDesc, matDescHeapH);
+		handle.ptr += heapStride;
+		//SPAテクスチャ
+		if (multiTex.spa.Get() != nullptr) {
+			auto desc = multiTex.spa->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(multiTex.spa.Get(), &srvDesc, handle);
 		}
 		else {
-			srvDesc.Format = _toonResources[i]->GetDesc().Format;
-			_dx12.Device()->CreateShaderResourceView(_toonResources[i].Get(), &srvDesc, matDescHeapH);
+			auto desc = _dx->BlackTexture()->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(_dx->BlackTexture().Get(), &srvDesc, handle);
 		}
-		matDescHeapH.ptr += incSize;
+		handle.ptr += heapStride;
+
+		//トゥーンテクスチャ
+		if (multiTex.toon.Get() != nullptr) {
+			auto desc = multiTex.toon->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(multiTex.toon.Get(), &srvDesc, handle);
+		}
+		else {
+			auto desc = _dx->GradTexture()->GetDesc();
+			srvDesc.Format = desc.Format;
+			dev->CreateShaderResourceView(_dx->GradTexture().Get(), &srvDesc, handle);
+		}
+		handle.ptr += heapStride;
+
+		viewDesc.BufferLocation += buffStride;
 	}
+	return true;
+}
+const D3D12_VERTEX_BUFFER_VIEW& 
+PMDActor::GetVertexBufferView()const {
+	return _vbView;
+}
+const D3D12_INDEX_BUFFER_VIEW& 
+PMDActor::GetIndexBufferView()const {
+	return _ibView;
 }
 
+ComPtr<ID3D12Resource> 
+PMDActor::GetMaterialBuffer() {
+	return _materialBuff;
+}
 
-void
+ComPtr<ID3D12DescriptorHeap> 
+PMDActor::GetMaterialAndTextureView() {
+	return _materialHeap;
+}
+
+void 
+PMDActor::UpdateMotion(uint32_t frame) {
+	//初期化
+	fill(_boneMatrices.begin(), _boneMatrices.end(), XMMatrixIdentity());
+
+	//まずはキーフレームごとにポージングしてみよう
+	for (auto& boneKeyFrame : _keyframes) {
+		auto& keyframes = boneKeyFrame.second;
+		auto rit = find_if(keyframes.rbegin(), keyframes.rend(),
+			[frame](const KeyFrame& f) {
+			return f.frameNo <= frame;
+		});
+		if (rit == keyframes.rend()) {
+			continue;
+		}
+		
+		float t = 0.0f;
+		auto it = rit.base();
+		XMVECTOR q = XMLoadFloat4(&rit->quaternion);
+		XMVECTOR ofst = XMLoadFloat3(&rit->offset);
+		XMMATRIX rot;
+		if (it != keyframes.end()) {
+			t = static_cast<float>(frame - rit->frameNo) /
+				static_cast<float>(it->frameNo - rit->frameNo);
+			
+			t = GetYFromXOnBezier(it->cpnt, t);
+
+			auto q2 = XMLoadFloat4(&it->quaternion);
+			q=XMQuaternionSlerp(q, q2, t);
+			
+			auto ofst2= XMLoadFloat3(&it->offset);
+			ofst=XMVectorLerp(ofst, ofst2, t);
+		}
+		rot = XMMatrixRotationQuaternion(q);
+
+		
+		//ないボーンには何もしない(ないボーンで不正なボーン操作を防ぐため)
+		auto& boneName = boneKeyFrame.first;
+		auto boneIt = _boneTable.find(boneName);
+		if (boneIt == _boneTable.end())continue;
+		auto& bone = boneIt->second;
+
+		auto& pos = bone.pos;
+		rot = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*
+			rot*
+			XMMatrixTranslation(pos.x, pos.y, pos.z);//90°曲げる
+		_boneMatrices[bone.index] = rot *XMMatrixTranslationFromVector(ofst);
+	}
+
+
+	
+
+	auto wm=XMMatrixTranslation(_pos.x, _pos.y, _pos.z);
+
+	auto eyeBoneIdx = _eyeBoneIdxes[0];
+	auto eyeEndBoneIdx = _boneTree[eyeBoneIdx][0];
+	auto startPos = XMVector3TransformCoord( XMLoadFloat3(&_boneAddressArray[eyeBoneIdx]->pos),_boneMatrices[eyeBoneIdx]);
+	auto endPos = XMVector3TransformCoord(XMLoadFloat3(&_boneAddressArray[eyeEndBoneIdx]->pos), _boneMatrices[eyeEndBoneIdx]);
+
+	auto wmstartPos = XMVector3Transform(startPos, wm);
+
+	//デフォルトの目線を計算
+	auto eyeVec = XMVector3Normalize(XMVectorSubtract(endPos, wmstartPos));
+	//カメラへの目線を計算
+	auto eyeToCamVec = XMVector3Normalize(XMVectorSubtract(_dx->GetCameraPosition(), wmstartPos));
+
+	auto up = XMFLOAT3(0, 1, 0);
+	auto right = XMFLOAT3(1, 0, 0);
+	XMVECTOR mz;
+	mz.m128_f32[0] = mz.m128_f32[1] = mz.m128_f32[3] = 0.0f;
+	mz.m128_f32[2] = -1;
+	auto mat = XMMatrixTranslationFromVector(-startPos);
+	mat *= LookAtMatrix(mz, eyeToCamVec, up, right);
+	mat *= XMMatrixTranslationFromVector(startPos);
+	_boneMatrices[eyeBoneIdx]= mat* _boneMatrices[eyeBoneIdx];
+
+	RecursiveBoneTransform(_boneTable["センター"].index, XMMatrixIdentity());
+
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedBoneMatrix);
+}
+
+void 
 PMDActor::Update() {
-	_angle += 0.001f;
-	_mappedMatrices[0] = XMMatrixRotationY(_angle);
-	MotionUpdate();
-}
-void
-PMDActor::Draw() {
-	_dx12.CommandList()->IASetVertexBuffers(0, 1, &_vbView);
-	_dx12.CommandList()->IASetIndexBuffer(&_ibView);
-
-	ID3D12DescriptorHeap* transheaps[] = { _transformHeap.Get() };
-	_dx12.CommandList()->SetDescriptorHeaps(1, transheaps);
-	_dx12.CommandList()->SetGraphicsRootDescriptorTable(1, _transformHeap->GetGPUDescriptorHandleForHeapStart());
-
-
-
-	ID3D12DescriptorHeap* mdh[] = { _materialHeap.Get() };
-	//マテリアル
-	_dx12.CommandList()->SetDescriptorHeaps(1, mdh);
-
-	auto materialH = _materialHeap->GetGPUDescriptorHandleForHeapStart();
-	unsigned int idxOffset = 0;
-
-	auto cbvsrvIncSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 5;
-	for (auto& m : _materials) {
-		_dx12.CommandList()->SetGraphicsRootDescriptorTable(2, materialH);
-		_dx12.CommandList()->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
-		materialH.ptr += cbvsrvIncSize;
-		idxOffset += m.indicesNum;
+	uint32_t frame = (GetTickCount() - _lastTickCount)/30;
+	UpdateMotion(frame);
+	if (frame > _duration) {
+		_lastTickCount = GetTickCount();
 	}
 
+
+	XMMATRIX worldMat = XMMatrixRotationRollPitchYaw(_rotator.x, _rotator.y, _rotator.z)*
+		XMMatrixTranslation(_pos.x, _pos.y, _pos.z);
+	*_mappedTransform = worldMat;
+}
+
+bool 
+PMDActor::CreateTransformBufferView() {
+	auto dev = _dx->Device();
+
+	//定数バッファビューの作成
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = 2;
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	auto result = dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(_transformHeap.ReleaseAndGetAddressOf()));
+	if (!CheckResult(result)) {
+		return false;
+	}
+
+	auto handle = _transformHeap->GetCPUDescriptorHandleForHeapStart();
+	
+	//ワールド変換行列用
+	D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
+	viewDesc.BufferLocation = _transformCB->GetGPUVirtualAddress();
+	viewDesc.SizeInBytes = _transformCB->GetDesc().Width;
+	dev->CreateConstantBufferView(&viewDesc, handle);
+
+	//ボーン行列用
+	viewDesc.BufferLocation = _bonesBuff->GetGPUVirtualAddress();
+	viewDesc.SizeInBytes = _bonesBuff->GetDesc().Width;
+	handle.ptr += _dx->Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	dev->CreateConstantBufferView(&viewDesc, handle);
+
+}
+
+ComPtr<ID3D12DescriptorHeap>
+PMDActor::GetTransformBufferView() {
+	return _transformHeap;
+}
+
+void 
+PMDActor::Draw() {
+	auto cmdlist = _dx->CmdList();
+
+	cmdlist->IASetVertexBuffers(0, 1, &_vbView);
+	cmdlist->IASetIndexBuffer(&_ibView);
+	cmdlist->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	//アクター座標変換
+	ID3D12DescriptorHeap* heaps[] = {_transformHeap.Get()};
+	
+	cmdlist->SetDescriptorHeaps(1, heaps);
+	auto actorHeapAddress = _transformHeap->GetGPUDescriptorHandleForHeapStart();
+	cmdlist->SetGraphicsRootDescriptorTable(2, actorHeapAddress);
+
+	auto matHeapAddress = _materialHeap->GetGPUDescriptorHandleForHeapStart();
+	heaps[0] = _materialHeap.Get();
+	cmdlist->SetDescriptorHeaps(1, heaps);
+	auto incSize = _dx->Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	uint32_t indexOffset = 0;//ループ前に変数を用意しとく
+	for (int i = 0; i < _materials.size(); ++i) {
+		cmdlist->SetGraphicsRootDescriptorTable(0, matHeapAddress);
+		auto& material = _materials[i];
+		cmdlist->DrawIndexedInstanced(material.indicesNum,
+			1,
+			indexOffset, 0, 0);
+		indexOffset += material.indicesNum;
+		matHeapAddress.ptr += incSize * 5;//マテリアルとテクスチャとSPHぶん
+	}
+}
+
+ComPtr<ID3D12Resource> 
+PMDActor::GetTransformBuffer() {
+	return _transformCB;
+}
+
+bool
+PMDActor::CreateTransformBuffer() {
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(
+		AligmentedValue(sizeof(XMMATRIX), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)
+	);
+	auto result = _dx->Device()->CreateCommittedResource(&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(_transformCB.ReleaseAndGetAddressOf()));
+
+	if (!CheckResult(result)) {
+		return false;
+	}
+
+	auto worldMat = XMMatrixIdentity();
+	result = _transformCB->Map(0, nullptr, (void**)&_mappedTransform);
+	*_mappedTransform = worldMat;
+
+	return true;
+
+}
+
+void 
+PMDActor::StartAmimation() {
+	_lastTickCount = GetTickCount();
 }

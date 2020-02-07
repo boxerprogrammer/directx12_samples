@@ -2,17 +2,22 @@
 #include"PMDActor.h"
 #include"Dx12Wrapper.h"
 #include"PMDRenderer.h"
+#include"imgui/imgui.h"
+#include"imgui/imgui_impl_win32.h"
+#include"imgui/imgui_impl_dx12.h"
 
 
 using namespace std;
 constexpr int window_width = 1280;
 constexpr int window_height = 720;
 
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	if (msg == WM_DESTROY) {
 		PostQuitMessage(0);
 		return 0;
 	}
+	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
@@ -74,6 +79,26 @@ Application::Initialize() {
 	if (!_dx12->Init()) {
 		return false;
 	}
+
+	//imguiの初期化
+	if (ImGui::CreateContext() == nullptr) {
+		assert(0);
+		return false;
+	}
+	bool blnResult = ImGui_ImplWin32_Init(_hwnd);
+	if (!blnResult) {
+		assert(0);
+		return false;
+	}
+	blnResult = ImGui_ImplDX12_Init(_dx12->Device(),//DirectX12デバイス
+		1,//frames_in_flightと説明にはあるがflightの意味が掴めず(後述)
+		DXGI_FORMAT_R8G8B8A8_UNORM,//書き込み先RTVのフォーマット
+		_dx12->GetHeapForImgui().Get(),//imgui用デスクリプタヒープ
+		_dx12->GetHeapForImgui()->GetCPUDescriptorHandleForHeapStart(),//CPUハンドル
+		_dx12->GetHeapForImgui()->GetGPUDescriptorHandleForHeapStart());//GPUハンドル
+
+
+
 	_pmdRenderer->Init();
 	_actor.reset(new PMDActor(_dx12,"Model/初音ミクmetal.pmd"));
 	_actor->LoadVMDData("motion/yagokoro.vmd");
@@ -112,9 +137,11 @@ Application::Initialize() {
 ///アプリケーション起動
 void 
 Application::Run() {
+	
 	ShowWindow(_hwnd, SW_SHOW);
 	MSG msg = {};
 	float fov = 3.1415926535897f / 4.0f;//π/4
+	
 	while (true) {//メインループ
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);//翻訳
@@ -183,7 +210,6 @@ Application::Run() {
 		_dx12->PreDrawShadow();
 		_pmdRenderer->DrawFromLight();
 
-		//_dx12->ExecuteAccumulatedCommand();
 		
 
 		//１枚目(ペラポリへ)
@@ -193,13 +219,11 @@ Application::Run() {
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
 
-		//_dx12->ExecuteAccumulatedCommand();
 
 		_dx12->DrawAmbientOcculusion();
 
-		//_dx12->ExecuteAccumulatedCommand();
 		////ブルーム用
-		_dx12->DrawShrinkTextureForBlur();
+		//_dx12->DrawShrinkTextureForBlur();
 
 		//2枚目(ペラポリ1→ペラポリ2へ)
 		//_dx12->DrawToPera2();
@@ -207,6 +231,50 @@ Application::Run() {
 		//3枚目(ペラポリ2→バックバッファへ)
 		_dx12->Clear();
 		_dx12->Draw(_pmdRenderer);
+
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+
+		
+
+		ImGui::Begin("Rendering Test Menu");
+		ImGui::SetWindowSize(ImVec2(400, 500), ImGuiCond_::ImGuiCond_FirstUseEver);
+		static bool blnDebugDisp = false;
+		ImGui::Checkbox("Debug Display",&blnDebugDisp);
+		static bool blnSSAO = false;
+		ImGui::Checkbox("SSAO on/off", &blnSSAO);
+		static bool blnShadowmap = false;
+		ImGui::Checkbox("Self Shadow on/off", &blnShadowmap);
+		constexpr float pi = 3.141592653589f;
+		if(ImGui::SliderFloat("Field of view", &fov, pi/6.0f, pi*5.0f/6.0f)){
+			_dx12->SetFov(fov);
+		}
+		static float lightVec[3] = { 1.0,-1.0,1.0f };
+		if (ImGui::SliderFloat3("Light vector", lightVec, -1.0f, 1.0f)) {
+			_dx12->SetLightVector(lightVec);
+		}
+		static float bgCol[4] = {0.5f,0.5f,0.5f,1.0f};
+		ImGui::ColorPicker4("BG color", bgCol, ImGuiColorEditFlags_::ImGuiColorEditFlags_PickerHueWheel |
+														ImGuiColorEditFlags_::ImGuiColorEditFlags_AlphaBar);
+		static float bloomCol[3] = {};
+		ImGui::ColorPicker3("Bloom color",bloomCol);
+
+		//Dx12Wrapperに対して設定を渡す
+		_dx12->SetDebugDisplay(blnDebugDisp);
+		_dx12->SetSSAO(blnSSAO);
+		_dx12->SetSelfShadow(blnShadowmap);
+		
+		_dx12->SetBackColor(bgCol);
+		_dx12->SetBloomColor(bloomCol);
+		
+
+		ImGui::End();
+		ImGui::Render();
+
+		_dx12->CmdList()->SetDescriptorHeaps(1, _dx12->GetHeapForImgui().GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _dx12->CmdList());
+
 		_dx12->Flip();
 	}
 }

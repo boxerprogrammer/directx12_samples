@@ -1,53 +1,44 @@
 #pragma once
 #include<Windows.h>
-#include<tchar.h>
-#include<d3d12.h>
-#include<dxgi1_6.h>
-#include<DirectXMath.h>
-#include<vector>
-#include<map>
-#include<d3dcompiler.h>
-#include<DirectXTex.h>
-#include<d3dx12.h>
-#include<wrl.h>
 #include<memory>
 
 class Dx12Wrapper;
-class PMDRenderer;
+
+struct Size {
+	int width;
+	int height;
+	Size() {}
+	Size(int w, int h) :width(w), height(h) {}
+};
+
 class PMDActor;
-///シングルトンクラス
+class PMDRenderer;
+
 class Application
 {
 private:
-	//ここに必要な変数(バッファやヒープなど)を書く
-	//ウィンドウ周り
-	WNDCLASSEX _windowClass;
-	HWND _hwnd;
+	HWND _hwnd;//まずこのウィンドウを操作するためのハンドルを作りたい
+	WNDCLASSEX _wndClass = {};
+
 	std::shared_ptr<Dx12Wrapper> _dx12;
+	std::shared_ptr<PMDActor> _actor;
 	std::shared_ptr<PMDRenderer> _pmdRenderer;
-	std::shared_ptr<PMDActor> _pmdActor;
-
-	//ゲーム用ウィンドウの生成
-	void CreateGameWindow(HWND &hwnd, WNDCLASSEX &windowClass);
-
-	//↓シングルトンのためにコンストラクタをprivateに
-	//さらにコピーと代入を禁止に
+	//コンストラクタをprivateにしてnewさせないように
 	Application();
+	//コピー、代入禁止
 	Application(const Application&) = delete;
 	void operator=(const Application&) = delete;
 public:
-	///Applicationのシングルトンインスタンスを得る
 	static Application& Instance();
-
-	///初期化
-	bool Init();
-
-	///ループ起動
+	///アプリケーション初期化
+	bool Initialize();
+	///アプリケーション起動
 	void Run();
-
-	///後処理
+	///アプリケーション終了
 	void Terminate();
-	SIZE GetWindowSize()const;
+
+	Size GetWindowSize();
+
 	~Application();
 };
 

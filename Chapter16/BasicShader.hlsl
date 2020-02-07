@@ -25,8 +25,9 @@ cbuffer sceneBuffer : register(b1) {
 	matrix invproj;//プロジェクション
 	matrix lightCamera;//ライトビュープロジェ
 	matrix shadow;//影行列
+	float4 lightVec;//ライトベクトル
 	float3 eye;//視点
-	
+	bool isSelfShadow;//シャドウマップフラグ
 };
 
 //アクター座標変換用スロット
@@ -116,7 +117,7 @@ PixelOutput PS(Output input) {
 
 
 	float3 eyeray = normalize(input.pos-eye);
-	float3 light = normalize(float3(1,-1,1));
+	float3 light = normalize(lightVec);
 	float3 rlight = reflect(light, input.normal);
 		
 	//スペキュラ輝度
@@ -149,14 +150,15 @@ PixelOutput PS(Output input) {
 		+ float4(specular*specB, 1);
 	
 	float shadowWeight = 1.0f;
-	float3 posFromLightVP=input.tpos.xyz / input.tpos.w;
-	float2 shadowUV = (posFromLightVP +float2(1,-1))*float2(0.5,-0.5);
-	float depthFromLight = lightDepthTex.SampleCmp(
-		shadowSmp, 
-		shadowUV, 
-		posFromLightVP.z-0.005f);
-	//shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
-	
+	if (isSelfShadow) {
+		float3 posFromLightVP = input.tpos.xyz / input.tpos.w;
+		float2 shadowUV = (posFromLightVP + float2(1, -1))*float2(0.5, -0.5);
+		float depthFromLight = lightDepthTex.SampleCmp(
+			shadowSmp,
+			shadowUV,
+			posFromLightVP.z - 0.005f);
+		shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
+	}
 	PixelOutput output;
 	output.col = float4(ret.rgb*shadowWeight, ret.a);
 	output.normal.rgb = float3((input.normal.xyz + 1.0f) / 2.0f);

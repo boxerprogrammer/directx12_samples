@@ -206,6 +206,7 @@ private:
 	ComPtr<ID3D12DescriptorHeap> _ssaoSRVDH;
 	bool CreateAmbientOcclusion();
 	
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateOneDescriptorHeapSRV();
 
 
 public:
@@ -288,6 +289,11 @@ public:
 	void MoveEyePosition(float x, float y, float z);
 
 	DirectX::XMVECTOR GetCameraPosition();
+
+	//ビューポートを返す
+	D3D12_VIEWPORT GetViewPort()const;
+	//SpriteFont用のDescriptorHeapを返す
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForSpriteFont();
 
 };
 

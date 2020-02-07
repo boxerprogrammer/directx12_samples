@@ -93,10 +93,14 @@ private:
 		DirectX::XMMATRIX invproj;//プロジェクション
 		DirectX::XMMATRIX lightCamera;//ライトから見たビュー
 		DirectX::XMMATRIX shadow;//影行列
+		DirectX::XMFLOAT4 lightVec;//ライトベクトル
 		DirectX::XMFLOAT3 eye;//視点
+		bool isSelfShadow;//シャドウマップフラグ
 	};
-	SceneMatrix* _mappedScene;
 
+
+	SceneMatrix* _mappedScene;
+	float _bgColor[4];
 	//視点(カメラの位置)XMVECTOR
 	//注視点(見る対象の位置)XMVECTOR
 	//上ベクトル(上)XMVECTOR
@@ -104,6 +108,8 @@ private:
 	DirectX::XMFLOAT3 _target;
 	DirectX::XMFLOAT3 _up;
 	float _fov = DirectX::XM_PI/6;
+	DirectX::XMFLOAT3 _lightVec;
+	bool _isSelfShadow;
 
 	bool CreateCommandList();
 	void Barrier(ID3D12Resource* p,
@@ -134,6 +140,17 @@ private:
 	ComPtr<ID3D12Resource> _peraCB;
 	ComPtr<ID3D12DescriptorHeap> _peraCBVHeap;
 	bool CreateConstantBufferForPera();
+
+	struct PostSetting {
+		bool isDebugDisp;//デバッグ表示
+		bool isSSAO;//SSAOオン
+		DirectX::XMFLOAT4 bloomColor;//ブルームカラー
+	};
+	ComPtr<ID3D12Resource> _postSettingResource;
+	PostSetting* _mappedPostSetting;
+	ComPtr<ID3D12DescriptorHeap> _postSettingDH;
+	bool CreatePostSetting();
+
 
 	//歪み用ノーマルマップ
 	ComPtr<ID3D12Resource> _distBuff;
@@ -171,6 +188,9 @@ private:
 
 	bool CreateAmbientOcclusionBuffer();
 	bool CreateAmbientOcclusionDescriptorHeap();
+
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForImgui();
+	ComPtr<ID3D12DescriptorHeap> _heapForImgui;
 
 public:
 	Dx12Wrapper(HWND hwnd);
@@ -222,7 +242,6 @@ public:
 
 	//フリップ
 	void Flip();
-	void ExecuteAccumulatedCommand();
 	void WaitForCommandQueue();
 
 	bool LoadPictureFromFile(std::wstring filepath, ComPtr<ID3D12Resource>& buff);
@@ -232,6 +251,14 @@ public:
 	void MoveEyePosition(float x, float y, float z);
 
 	DirectX::XMVECTOR GetCameraPosition();
+
+	ComPtr<ID3D12DescriptorHeap> GetHeapForImgui();
+	void SetDebugDisplay(bool flg);///デバッグ表示のON / OFF
+	void SetSSAO(bool flg);///アンビエントオクルージョンのON / OFF
+	void SetSelfShadow(bool flg);///セルフシャドウON / OFF
+	void SetLightVector(float vec[3]);///光線ベクトル(xyzベクトル)
+	void SetBackColor(float col[4]);///背景色の変更
+	void SetBloomColor(float col[3]);///ブルームの色付け
 
 };
 

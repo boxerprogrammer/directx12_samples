@@ -3,6 +3,7 @@
 #include"Dx12Wrapper.h"
 #include"PMDRenderer.h"
 
+
 using namespace std;
 constexpr int window_width = 1280;
 constexpr int window_height = 720;
@@ -74,37 +75,36 @@ Application::Initialize() {
 		return false;
 	}
 	_pmdRenderer->Init();
-	_actor=make_shared< PMDActor>(_dx12, "Model/初音ミク.pmd");
-	_actor->Move(-10, 0, 0);
+	_actor.reset(new PMDActor(_dx12,"Model/初音ミクmetal.pmd"));
 	_actor->LoadVMDData("motion/yagokoro.vmd");
+	_actor->Move(-10, 0, 10);
 	_pmdRenderer->AddActor(_actor);
 
+	auto miku=make_shared<PMDActor>(_dx12, "Model/初音ミク.pmd");
+	miku->LoadVMDData("motion/yagokoro.vmd");
+	miku->Move(0, 0, 0);
+	_pmdRenderer->AddActor(miku);
+
+	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
+	kaito->LoadVMDData("motion/yagokoro.vmd");
+	kaito->Move(-5, 0, 5);
+	_pmdRenderer->AddActor(kaito);
 
 	auto ruka = make_shared<PMDActor>(_dx12, "Model/巡音ルカ.pmd");
 	ruka->LoadVMDData("motion/yagokoro.vmd");
+	ruka->Move(10, 0, 10);
 	_pmdRenderer->AddActor(ruka);
 
-	auto haku = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
-	haku->Move(-5, 0, 5);
-	haku->LoadVMDData("motion/yagokoro.vmd");
-	_pmdRenderer->AddActor(haku);
-
-	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
-	rin->LoadVMDData("motion/yagokoro.vmd");
-	rin->Move(10, 0, 10);
-	_pmdRenderer->AddActor(rin);
-
-	
 	auto meiko = make_shared<PMDActor>(_dx12, "Model/咲音メイコ.pmd");
-	meiko->Move(-10, 0, 10);
 	meiko->LoadVMDData("motion/yagokoro.vmd");
+	meiko->Move(-10, 0, 0);
 	_pmdRenderer->AddActor(meiko);
 	
-	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
-	kaito->Move(10, 0, 0);
-	kaito->LoadVMDData("motion/yagokoro.vmd");
-	_pmdRenderer->AddActor(kaito);
-	
+	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
+	rin->LoadVMDData("motion/yagokoro.vmd");
+	rin->Move(10, 0, 0);
+	_pmdRenderer->AddActor(rin);
+
 
 	_pmdRenderer->AnimationStart();
 	return true;
@@ -128,16 +128,16 @@ Application::Run() {
 		float x=0, y=0, z = 0;
 		
 		if (keycode[VK_RIGHT]&0x80) {
-			x += 0.3f;
+			x += 0.1f;
 		}
 		if (keycode[VK_LEFT] & 0x80) {
-			x -= 0.3f;
+			x -= 0.1f;
 		}
 		if (keycode[VK_UP] & 0x80) {
-			y += 0.3f;
+			y += 0.1f;
 		}
 		if (keycode[VK_DOWN] & 0x80) {
-			y -= 0.3f;
+			y -= 0.1f;
 		}
 		if (keycode['Z'] & 0x80) {
 			fov += 0.01f;
@@ -168,29 +168,39 @@ Application::Run() {
 		if (keycode['Y'] & 0x80) {
 			_actor->Rotate(0, 0, 0.01f);
 		}
+
+
 		_actor->Move(px, py, pz);
 		
 		_dx12->MoveEyePosition(x, y, z);
 		_dx12->SetFov(fov);
-		_dx12->PreDrawToPera1();
+		_dx12->SetCameraSetting();
+
 		_pmdRenderer->Update();
+
+		_pmdRenderer->BeforeDrawFromLight();
+		//影への描画
+		_dx12->PreDrawShadow();
+		_pmdRenderer->DrawFromLight();
+
+		
+
+		//１枚目(ペラポリへ)
+		_dx12->PreDrawToPera1();
+		//_dx12->DrawPrimitiveShapes();
 		_pmdRenderer->BeforeDraw();
 		_dx12->DrawToPera1(_pmdRenderer);
 		_pmdRenderer->Draw();
-		_dx12->PostDrawToPera1();
 
-		
+		//ブルーム用
+		_dx12->DrawShrinkTextureForBlur();
 
-		//_pmdRenderer->Update();
-		//_pmdRenderer->BeforeDraw();
-		
-		_dx12->DrawHorizontalBokeh();
+		//2枚目(ペラポリ1→ペラポリ2へ)
+		//_dx12->DrawToPera2();
 
+		//3枚目(ペラポリ2→バックバッファへ)
 		_dx12->Clear();
 		_dx12->Draw(_pmdRenderer);
-
-		//_pmdRenderer->Draw();
-
 		_dx12->Flip();
 	}
 }

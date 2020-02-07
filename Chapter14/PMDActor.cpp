@@ -70,7 +70,6 @@ namespace {
 		// その得られたtをもとにベジェの式によりyを返す
 		//ただし、P0=(0,0),P1=(1,1)
 
-			   
 		//もしp1.x==p1.y && p2.x==p2.yの場合、これは曲線ではない
 		//計算がもったいないのでそのまま返す
 		if (cPoints[0].x == cPoints[0].y && cPoints[1].x == cPoints[1].y) {
@@ -80,15 +79,16 @@ namespace {
 		float t = x;
 		float r = 1.0f - t;
 		for (int i = 0; i < trycnt; ++i) {
-			float fx = 3 * cPoints[0].x * r*r*t +
-				3*cPoints[1].x * r*t*t +
-				t*t*t - x;
+			//P1～P4だとすると
+			float ft = 3 * cPoints[0].x * r*r*t +//P2
+						3*cPoints[1].x * r*t*t +//P3
+						t*t*t - x;//P4=1なのでt^3-xとなる
 
-			if (abs(fx) <= epsilon) {
+			if (abs(ft) <= epsilon) {
 				break;
 			}
 
-			t -= fx / 2.0f;
+			t -= ft / 2.0f;
 			r = 1.0f - t;
 		}
 
@@ -100,29 +100,32 @@ namespace {
 ///@param lookat 向かせたい方向ベクトル
 ///@param up 上ベクトル
 ///@param right 右ベクトル
-XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
-	//向かせたい方向(z軸)
-	XMVECTOR vz = XMVector3Normalize(lookat);
-	//(向かせたい方向を向かせたときの)仮のy軸ベクトル
-	XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
-	//(向かせたい方向を向かせたときの)y軸
-	XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vy, vz));
-	vy = XMVector3Normalize(XMVector3Cross(vz, vx));
-	///LookAtとupが同じ方向を向いてたらright基準で作り直す
-	if (abs(XMVector3Dot(vy, vz).m128_f32[0]) == 1.0f) {
-		//仮のX方向を定義
-		vx = XMVector3Normalize(XMLoadFloat3(&right));
-		//向かせたい方向を向かせたときのY軸を計算
+	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+		//向かせたい方向(z軸)
+		XMVECTOR vz = XMVector3Normalize(lookat);
+
+		//(向かせたい方向を向かせたときの)仮のy軸ベクトル
+		XMVECTOR vy = XMVector3Normalize(XMLoadFloat3(&up));
+
+		//(向かせたい方向を向かせたときの)y軸
+		XMVECTOR vx = XMVector3Normalize(XMVector3Cross(vy, vz));
 		vy = XMVector3Normalize(XMVector3Cross(vz, vx));
-		//真のX軸を計算
-		vx = XMVector3Normalize(XMVector3Cross(vy, vz));
+
+		///LookAtとupが同じ方向を向いてたらright基準で作り直す
+		if (abs(XMVector3Dot(vy, vz).m128_f32[0]) == 1.0f) {
+			//仮のX方向を定義
+			vx = XMVector3Normalize(XMLoadFloat3(&right));
+			//向かせたい方向を向かせたときのY軸を計算
+			vy = XMVector3Normalize(XMVector3Cross(vz, vx));
+			//真のX軸を計算
+			vx = XMVector3Normalize(XMVector3Cross(vy, vz));
+		}
+		XMMATRIX ret = XMMatrixIdentity();
+		ret.r[0] = vx;
+		ret.r[1] = vy;
+		ret.r[2] = vz;
+		return ret;
 	}
-	XMMATRIX ret = XMMatrixIdentity();
-	ret.r[0] = vx;
-	ret.r[1] = vy;
-	ret.r[2] = vz;
-	return ret;
-}
 
 	///特定のベクトルを特定の方向に向けるための行列を返す
 	///@param origin 特定のベクトル
@@ -136,19 +139,6 @@ XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
 	}
 }
 
-std::vector<uint16_t>& 
-PMDActor::GetIndexData() {
-	return _indexData;
-}
-unsigned int 
-PMDActor::GetIndexNum()const {
-	return _indexNum;
-}
-
-unsigned int 
-PMDActor::GetVertexNum()const {
-	return _vertNum;
-}
 
 bool 
 PMDActor::LoadFromPMD(const char* filepath) {
@@ -242,7 +232,7 @@ PMDActor::LoadFromPMD(const char* filepath) {
 		if (materials[i].toon != 0xff) {
 			//トゥーンパスを得る
 			ostringstream oss;
-			oss << "toon/toon" << setw(2) << setfill('0') << static_cast<int>(materials[i].toon + 1) << ".bmp";
+			oss << "Model/toon/toon" << setw(2) << setfill('0') << static_cast<int>(materials[i].toon + 1) << ".bmp";
 			_texturePaths[i].toonPath = oss.str();
 		}
 		_materials[i].indicesNum = materials[i].indexNum;
@@ -311,6 +301,8 @@ PMDActor::PMDActor(shared_ptr<Dx12Wrapper> dx ,const char* path):_dx(dx),_pos(0,
 	if (!CreateMaterialBufferView()) {
 		return;
 	}
+		
+
 	if (!CreateBoneBuffer()) {
 		return;
 	}
@@ -410,10 +402,6 @@ PMDActor::~PMDActor()
 {
 }
 
-std::vector<uint8_t>& 
-PMDActor::GetVertexData() {
-	return _vertexData;
-}
 std::vector<Material>& 
 PMDActor::Materials() {
 	return _materials;
@@ -689,14 +677,7 @@ PMDActor::CreateMaterialBufferView() {
 	}
 	return true;
 }
-const D3D12_VERTEX_BUFFER_VIEW& 
-PMDActor::GetVertexBufferView()const {
-	return _vbView;
-}
-const D3D12_INDEX_BUFFER_VIEW& 
-PMDActor::GetIndexBufferView()const {
-	return _ibView;
-}
+
 
 ComPtr<ID3D12Resource> 
 PMDActor::GetMaterialBuffer() {
@@ -800,6 +781,7 @@ PMDActor::Update() {
 
 	XMMATRIX worldMat = XMMatrixRotationRollPitchYaw(_rotator.x, _rotator.y, _rotator.z)*
 		XMMatrixTranslation(_pos.x, _pos.y, _pos.z);
+
 	*_mappedTransform = worldMat;
 }
 
@@ -835,13 +817,8 @@ PMDActor::CreateTransformBufferView() {
 
 }
 
-ComPtr<ID3D12DescriptorHeap>
-PMDActor::GetTransformBufferView() {
-	return _transformHeap;
-}
-
 void 
-PMDActor::Draw() {
+PMDActor::Draw(bool isShadow) {
 	auto cmdlist = _dx->CmdList();
 
 	cmdlist->IASetVertexBuffers(0, 1, &_vbView);
@@ -860,20 +837,20 @@ PMDActor::Draw() {
 	cmdlist->SetDescriptorHeaps(1, heaps);
 	auto incSize = _dx->Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	uint32_t indexOffset = 0;//ループ前に変数を用意しとく
-	for (int i = 0; i < _materials.size(); ++i) {
-		cmdlist->SetGraphicsRootDescriptorTable(0, matHeapAddress);
-		auto& material = _materials[i];
-		cmdlist->DrawIndexedInstanced(material.indicesNum,
-			2,
-			indexOffset, 0, 0);
-		indexOffset += material.indicesNum;
-		matHeapAddress.ptr += incSize * 5;//マテリアルとテクスチャとSPHぶん
+	if (isShadow) {
+		cmdlist->DrawIndexedInstanced(_indexNum, 1, 0, 0, 0);
 	}
-}
-
-ComPtr<ID3D12Resource> 
-PMDActor::GetTransformBuffer() {
-	return _transformCB;
+	else {
+		for (int i = 0; i < _materials.size(); ++i) {
+			cmdlist->SetGraphicsRootDescriptorTable(0, matHeapAddress);
+			auto& material = _materials[i];
+			cmdlist->DrawIndexedInstanced(material.indicesNum,
+				1,//本体と影
+				indexOffset, 0, 0);
+			indexOffset += material.indicesNum;
+			matHeapAddress.ptr += incSize * 5;//マテリアルとテクスチャとSPHぶん
+		}
+	}
 }
 
 bool

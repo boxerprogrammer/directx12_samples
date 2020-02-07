@@ -137,14 +137,6 @@ public:
 	unsigned int GetMaterialNum()const;
 	ComPtr<ID3D12DescriptorHeap> GetMaterialAndTextureView();
 
-	ComPtr<ID3D12Resource> GetTransformBuffer();
-	ComPtr<ID3D12DescriptorHeap> GetTransformBufferView();
-
-	std::vector<uint8_t>& GetVertexData();
-	unsigned int GetVertexNum()const;
-
-	std::vector<uint16_t>& GetIndexData();
-	unsigned int GetIndexNum()const;
 
 	std::vector<Material>& Materials();
 
@@ -156,7 +148,7 @@ public:
 	const DirectX::XMFLOAT3& GetPosition()const;
 	const DirectX::XMFLOAT3& GetRotate()const;
 	void Update();
-	void Draw();
+	void Draw(bool isShadow=false);
 	void StartAmimation();
 
 };

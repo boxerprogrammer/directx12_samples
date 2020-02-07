@@ -1,7 +1,5 @@
 #include<string>
 #include<assert.h>
-#include<vector>
-#include<cmath>
 #include "Helper.h"
 
 
@@ -14,27 +12,6 @@ Helper::Helper()
 
 Helper::~Helper()
 {
-}
-
-std::vector<float> 
-GetGaussianWeights(size_t count, float s) {
-	std::vector<float> weights(count);//ウェイト配列返却用
-	float x = 0.0f;
-	float total = 0.0f;
-	for (auto& wgt : weights) {
-		wgt = expf(-(x*x) / (2 * s*s));
-		total += wgt;
-		x += 1.0f;
-	}
-	//真ん中を中心に左右に広がるように作りますので
-	//左右という事で2倍します。しかしその場合は中心の0のピクセルが
-	//重複してしまいますのでe^0=1ということで最後に1を引いて辻褄が合うようにしています。
-	total = total * 2.0f - 1.0f;
-	//足して１になるようにする
-	for (auto& wgt : weights) {
-		wgt /= total;
-	}
-	return weights;
 }
 
 //１バイトstringをワイド文字wstringに変換する
@@ -79,4 +56,27 @@ bool CheckResult(HRESULT &result, ID3DBlob * errBlob)
 unsigned int
 AligmentedValue(unsigned int size, unsigned int alignment) {
 	return (size + alignment - (size%alignment));
+}
+
+std::vector<float> 
+GetGaussianValues(float s, size_t sampleNum) {
+	std::vector<float> weight(sampleNum);
+	float total = 0;//後から割るために合計値を記録
+	for (int i = 0; i < sampleNum; ++i) {
+		float x = static_cast<float>(i);
+		auto wgt= expf(-(x * x) / (2 * s*s));
+		weight[i] = wgt;
+		total += wgt;
+	}
+	//ここまでだと、右半分だけなので
+	//左半分(左右対称なので、データはいらない)
+	//でもトータルは再計算。２倍してデータ0番が
+	//重複しているため、これを引く
+	total = total * 2 - weight[0];
+	for (auto& wgt : weight) {
+		wgt /= total;
+	}
+
+	return weight;
+
 }

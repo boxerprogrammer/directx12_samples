@@ -32,6 +32,7 @@ public:
 	static Application& Instance();
 	///アプリケーション初期化
 	bool Initialize();
+	void SyncronizeEffekseerCamera();
 	///アプリケーション起動
 	void Run();
 	///アプリケーション終了

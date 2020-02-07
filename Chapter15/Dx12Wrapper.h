@@ -90,6 +90,7 @@ private:
 	struct SceneMatrix {
 		DirectX::XMMATRIX view;//ビュー
 		DirectX::XMMATRIX proj;//プロジェクション
+		DirectX::XMMATRIX invproj;//プロジェクション
 		DirectX::XMMATRIX lightCamera;//ライトから見たビュー
 		DirectX::XMMATRIX shadow;//影行列
 		DirectX::XMFLOAT3 eye;//視点
@@ -129,9 +130,6 @@ private:
 	ComPtr<ID3D12PipelineState> _peraPipeline;
 	ComPtr<ID3D12RootSignature> _peraRS;
 
-	
-
-
 	//ペラポリに投げる定数バッファ
 	ComPtr<ID3D12Resource> _peraCB;
 	ComPtr<ID3D12DescriptorHeap> _peraCBVHeap;
@@ -164,6 +162,15 @@ private:
 	ComPtr<ID3D12Resource> _dofBuffer;//被写界深度用ぼかしバッファ
 	bool CreateBloomBuffer();
 	bool CreateBlurForDOFBuffer();
+
+
+	ComPtr<ID3D12Resource> _aoBuffer;
+	ComPtr<ID3D12PipelineState> _aoPipeline;
+	ComPtr<ID3D12DescriptorHeap> _aoRTVDH;
+	ComPtr<ID3D12DescriptorHeap> _aoSRVDH;
+
+	bool CreateAmbientOcclusionBuffer();
+	bool CreateAmbientOcclusionDescriptorHeap();
 
 public:
 	Dx12Wrapper(HWND hwnd);
@@ -202,8 +209,9 @@ public:
 	///プリミティブ形状(平面、円柱、円錐、球)を描画
 	void DrawPrimitiveShapes();
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
-
+	void DrawToPera2();
 	void DrawShrinkTextureForBlur();
+	void DrawAmbientOcculusion();
 	//画面のクリア
 	bool Clear();
 
@@ -214,6 +222,7 @@ public:
 
 	//フリップ
 	void Flip();
+	void ExecuteAccumulatedCommand();
 	void WaitForCommandQueue();
 
 	bool LoadPictureFromFile(std::wstring filepath, ComPtr<ID3D12Resource>& buff);

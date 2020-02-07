@@ -45,7 +45,7 @@ Output BasicVS(float4 pos : POSITION , float4 normal : NORMAL, float2 uv : TEXCO
 	output.svpos = mul(mul(proj,view),pos);//シェーダでは列優先なので注意
 	output.pos = mul(view, pos);
 	normal.w = 0;//ここ重要(平行移動成分を無効にする)
-	output.normal = mul(world,mul(bm,normal));//法線にもボーンとワールド変換を行う
+	output.normal = mul(world,normal);//法線にもワールド変換を行う
 	output.vnormal = mul(view, output.normal);
 	output.uv = uv;
 	output.ray = normalize(output.pos.xyz - mul(view,eye));//視線ベクトル
@@ -72,7 +72,7 @@ float4 BasicPS(Output input) : SV_TARGET{
 	float4 ambCol = float4(ambient*0.6, 1);
 	float4 texColor = tex.Sample(smp, input.uv); //テクスチャカラー
 	return saturate((toonDif//輝度(トゥーン)
-		* diffuse + ambCol)//ディフューズ色
+		* diffuse + ambCol*0.5)//ディフューズ色
 		*texColor//テクスチャカラー
 		*sph.Sample(smp, sphereMapUV)//スフィアマップ(乗算)
 		+ spa.Sample(smp, sphereMapUV)//スフィアマップ(加算)

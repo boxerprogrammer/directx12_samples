@@ -90,17 +90,13 @@ private:
 	struct SceneMatrix {
 		DirectX::XMMATRIX view;//ビュー
 		DirectX::XMMATRIX proj;//プロジェクション
-		DirectX::XMMATRIX invproj;//プロジェクション
+		DirectX::XMMATRIX invProj;//逆プロジェクション
 		DirectX::XMMATRIX lightCamera;//ライトから見たビュー
 		DirectX::XMMATRIX shadow;//影行列
-		DirectX::XMFLOAT4 lightVec;//ライトベクトル
 		DirectX::XMFLOAT3 eye;//視点
-		bool isSelfShadow;//シャドウマップフラグ
 	};
-
-
 	SceneMatrix* _mappedScene;
-	float _bgColor[4];
+
 	//視点(カメラの位置)XMVECTOR
 	//注視点(見る対象の位置)XMVECTOR
 	//上ベクトル(上)XMVECTOR
@@ -108,22 +104,19 @@ private:
 	DirectX::XMFLOAT3 _target;
 	DirectX::XMFLOAT3 _up;
 	float _fov = DirectX::XM_PI/6;
-	DirectX::XMFLOAT3 _lightVec;
-	bool _isSelfShadow;
 
 	bool CreateCommandList();
 	void Barrier(ID3D12Resource* p,
 		D3D12_RESOURCE_STATES before, 
 		D3D12_RESOURCE_STATES after);
 
-	//std::vector<PMDActor*> _actors;
-
 	//1枚目レンダリング用
 	//いわゆるペラポリに張り付けるための絵の
 	//メモリリソースとそのビュー
 	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
 	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
-	std::array<ComPtr<ID3D12Resource>,2> _pera1Resources;
+	std::array < ComPtr<ID3D12Resource>,3> _peraResources;//標準、法線、高輝度
+
 	//１枚目ペラポリのためのリソースとビューを
 	//作成
 	bool CreatePera1ResourceAndView();
@@ -136,29 +129,29 @@ private:
 	ComPtr<ID3D12PipelineState> _peraPipeline;
 	ComPtr<ID3D12RootSignature> _peraRS;
 
+	//２枚目ペラ用
+	//なお、頂点バッファおよびルートシグネチャ
+	//およびでスクリプタヒープは１枚目と共用するので
+	//リソースとパイプラインだけでOK
+	ComPtr<ID3D12Resource> _peraResource2;
+	ComPtr<ID3D12PipelineState> _peraPipeline2;
+	// ペラポリ２枚目用
+	bool CreatePera2Resource();
+	
+
+
 	//ペラポリに投げる定数バッファ
 	ComPtr<ID3D12Resource> _peraCB;
 	ComPtr<ID3D12DescriptorHeap> _peraCBVHeap;
 	bool CreateConstantBufferForPera();
 
-	struct PostSetting {
-		bool isDebugDisp;//デバッグ表示
-		bool isSSAO;//SSAOオン
-		DirectX::XMFLOAT4 bloomColor;//ブルームカラー
-	};
-	ComPtr<ID3D12Resource> _postSettingResource;
-	PostSetting* _mappedPostSetting;
-	ComPtr<ID3D12DescriptorHeap> _postSettingDH;
-	bool CreatePostSetting();
-
-
 	//歪み用ノーマルマップ
 	ComPtr<ID3D12Resource> _distBuff;
 	ComPtr<ID3D12DescriptorHeap> _distSRVHeap;
-	//深度値テクスチャ用
+	//深度値用テクスチャ
 	ComPtr<ID3D12DescriptorHeap> _depthSRVHeap;
 	bool CreateDistortion();
-	bool CreateDepthSRV();
+	bool CreateDepthSRVForTest();
 
 	//プリミティブ用頂点バッファ
 	std::vector<ComPtr<ID3D12Resource>> _primitivesVB;
@@ -173,28 +166,57 @@ private:
 	ComPtr<ID3D12PipelineState> _primitivePipeline;
 	bool CreatePrimitivePipeline();
 	bool CreatePrimitiveRootSignature();
+
+	struct PostSetting{
+		uint32_t outlineFlg;
+		uint32_t rimFlg;
+		float rimStrength;
+		uint32_t debugDispFlg;
+		uint32_t normalOutlineFlg;
+		uint32_t directionalLight;
+		uint32_t antiAlias;
+		uint32_t bloomFlg;
+		uint32_t dofFlg;
+		uint32_t aoFlg;
+		uint32_t tryCount;
+		float aoRadius;
+		DirectX::XMFLOAT4 bloomColor;
+		DirectX::XMFLOAT2 focusPos;
+	};
+	ComPtr<ID3D12Resource> _postSetting;
+	PostSetting* _mappedPostSetting;
+	ComPtr<ID3D12DescriptorHeap> _postSettingDH;
+	bool CreatePostSetting();
+
+	enum class ShrinkType {
+		bloom,//ブルーム用
+		dof//被写界深度用
+	};
+	//縮小バッファ処理用
+	ComPtr<ID3D12PipelineState> _shrinkPipeline;
+	std::array<ComPtr<ID3D12Resource>,2> _shrinkBuffers;
+	ComPtr<ID3D12DescriptorHeap> _shrinkRTVDH;
+	ComPtr<ID3D12DescriptorHeap> _shrinkSRVDH;
+	bool CreateShrinkBufferAndView();
 	
-	ComPtr<ID3D12PipelineState> _blurPipeline;//画面全体ぼかし用パイプライン
-	std::array<ComPtr<ID3D12Resource>, 2> _bloomBuffers;//ブルーム用バッファ
-	ComPtr<ID3D12Resource> _dofBuffer;//被写界深度用ぼかしバッファ
-	bool CreateBloomBuffer();
-	bool CreateBlurForDOFBuffer();
+	//アンビエントオクルージョン用
+	ComPtr<ID3D12PipelineState> _ssaoPipeline;
+	ComPtr<ID3D12Resource> _ssaoBuffer;
+	ComPtr<ID3D12DescriptorHeap> _ssaoRTVDH;
+	ComPtr<ID3D12DescriptorHeap> _ssaoSRVDH;
+	bool CreateAmbientOcclusion();
+	
 
-
-	ComPtr<ID3D12Resource> _aoBuffer;
-	ComPtr<ID3D12PipelineState> _aoPipeline;
-	ComPtr<ID3D12DescriptorHeap> _aoRTVDH;
-	ComPtr<ID3D12DescriptorHeap> _aoSRVDH;
-
-	bool CreateAmbientOcclusionBuffer();
-	bool CreateAmbientOcclusionDescriptorHeap();
-
-	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForImgui();
-	ComPtr<ID3D12DescriptorHeap> _heapForImgui;
 
 public:
 	Dx12Wrapper(HWND hwnd);
 	~Dx12Wrapper();
+
+	DirectX::XMMATRIX ViewMatrix()const;
+	DirectX::XMMATRIX ProjMatrix()const;
+
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForImgUi();
+
 
 	ID3D12Device* Device() {
 		return _dev.Get();
@@ -214,6 +236,19 @@ public:
 	ComPtr<ID3D12Resource> BlackTexture();
 	ComPtr<ID3D12Resource> GradTexture();
 
+	void SetOutline(bool flgOnOff);
+	void SetNormalOutline(bool flgOnOff);
+	void SetRimLight(bool flgOnOff,float strength);
+	void SetDebugDisplay(bool debugDispFlg);
+	void SetDirectionalLight(bool flg);
+	void SetAA(bool flg);
+	void SetBloom(bool flg);
+	void SetBloomColor(float col[4]);
+	void SetDOF(bool dofFlg);
+	void SetFocusPos(float x,float y);
+	void SetAO(bool aoFlg);
+	void SetAOTryCount(uint32_t trycount);
+	void SetAORadius(float radius);
 
 
 	bool CreatePeraVertex();
@@ -223,20 +258,22 @@ public:
 	bool PreDrawShadow();
 
 	//ペラポリゴンへの描画準備
-	bool PreDrawToPera1();
+	bool PreDrawToPera1(float clsClr[4]);
 
 	//ペラポリゴンへの描画
 	///プリミティブ形状(平面、円柱、円錐、球)を描画
 	void DrawPrimitiveShapes();
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
+	void DrawAmbientOcclusion();
 	void DrawToPera2();
-	void DrawShrinkTextureForBlur();
-	void DrawAmbientOcculusion();
 	//画面のクリア
 	bool Clear();
 
 	//描画
 	void Draw(std::shared_ptr<PMDRenderer> renderer);
+
+	//縮小バッファへ描画
+	void DrawToShrinkBuffer();
 
 	void SetCameraSetting();
 
@@ -251,14 +288,6 @@ public:
 	void MoveEyePosition(float x, float y, float z);
 
 	DirectX::XMVECTOR GetCameraPosition();
-
-	ComPtr<ID3D12DescriptorHeap> GetHeapForImgui();
-	void SetDebugDisplay(bool flg);///デバッグ表示のON / OFF
-	void SetSSAO(bool flg);///アンビエントオクルージョンのON / OFF
-	void SetSelfShadow(bool flg);///セルフシャドウON / OFF
-	void SetLightVector(float vec[3]);///光線ベクトル(xyzベクトル)
-	void SetBackColor(float col[4]);///背景色の変更
-	void SetBloomColor(float col[3]);///ブルームの色付け
 
 };
 

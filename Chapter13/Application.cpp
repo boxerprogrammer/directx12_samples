@@ -128,16 +128,16 @@ Application::Run() {
 		float x=0, y=0, z = 0;
 		
 		if (keycode[VK_RIGHT]&0x80) {
-			x += 0.1f;
+			x += 0.3f;
 		}
 		if (keycode[VK_LEFT] & 0x80) {
-			x -= 0.1f;
+			x -= 0.3f;
 		}
 		if (keycode[VK_UP] & 0x80) {
-			y += 0.1f;
+			y += 0.3f;
 		}
 		if (keycode[VK_DOWN] & 0x80) {
-			y -= 0.1f;
+			y -= 0.3f;
 		}
 		if (keycode['Z'] & 0x80) {
 			fov += 0.01f;

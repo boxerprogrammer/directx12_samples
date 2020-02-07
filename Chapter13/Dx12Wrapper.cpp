@@ -24,7 +24,8 @@ using namespace std;
 Dx12Wrapper::Dx12Wrapper(HWND hwnd): _hwnd(hwnd),
 	_eye(0,15,-25),
 	_target(0,10,0),
-	_up(0,1,0)
+	_up(0,1,0),
+	_parallelLightVec(1,-1,1)
 {
 	
 }
@@ -402,7 +403,7 @@ Dx12Wrapper::CreateDepthBuffer() {
 	D3D12_HEAP_PROPERTIES heapprop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	auto wsize = Application::Instance().GetWindowSize();
-	D3D12_RESOURCE_DESC resdesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, wsize.width, wsize.height);
+	D3D12_RESOURCE_DESC resdesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32_TYPELESS, wsize.width, wsize.height);
 	resdesc.Flags= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 	D3D12_CLEAR_VALUE cv = {};
@@ -661,6 +662,10 @@ void Dx12Wrapper::SetCameraSetting()
 		static_cast<float>(wsize.width) / static_cast<float>(wsize.height),
 		1.0f,
 		1000.0f);
+
+XMFLOAT4 planeNormalVec(0, 1, 0,0);
+_mappedScene->shadow = XMMatrixShadow(XMLoadFloat4(&planeNormalVec), -XMLoadFloat3(&_parallelLightVec));
+
 }
 
 bool

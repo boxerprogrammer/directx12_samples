@@ -44,7 +44,7 @@ Dx12Wrapper::CreateAmbientOcclusionBuffer() {
 	result = _dev->CreateCommittedResource(&heapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		&clearValue,
 		IID_PPV_ARGS(_aoBuffer.ReleaseAndGetAddressOf()));
 	if (!CheckResult(result)) {
@@ -147,10 +147,12 @@ Dx12Wrapper::CreateConstantBufferForPera() {
 
 }
 
-Dx12Wrapper::Dx12Wrapper(HWND hwnd): _hwnd(hwnd),
-	_eye(0,15,-25),
-	_target(0,10,0),
-	_up(0,1,0)
+Dx12Wrapper::Dx12Wrapper(HWND hwnd) : _hwnd(hwnd),
+_eye(0, 15, -25),
+_target(0, 10, 0),
+_up(0, 1, 0),
+_lightVec(1, -1, 1),
+_isSelfShadow(false)
 {
 	
 
@@ -349,6 +351,17 @@ Dx12Wrapper::Init() {
 		return false;
 	}
 
+	//初期化時に呼び出す
+	_heapForImgui = CreateDescriptorHeapForImgui();
+	if (_heapForImgui == nullptr) {
+		return false;
+	}
+
+	//設定パラメータ渡し用
+	if (!CreatePostSetting()) {
+		return false;
+	}
+
 	return true;
 
 }
@@ -512,7 +525,7 @@ Dx12Wrapper::PreDrawToPera1() {
 		if (i == 2) {
 			clsClr[0] = clsClr[1] = clsClr[2] = 0.0f; clsClr[3] = 1.0f;
 		}
-		_cmdList->ClearRenderTargetView(handles[i], clsClr, 0, nullptr);
+		_cmdList->ClearRenderTargetView(handles[i], _bgColor, 0, nullptr);
 	}
 	_cmdList->ClearDepthStencilView(_dsvHeap->GetCPUDescriptorHandleForHeapStart(),
 		D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
@@ -527,6 +540,12 @@ Dx12Wrapper::PreDrawToPera1() {
 
 bool
 Dx12Wrapper::Clear() {
+	//for (auto& res : _pera1Resources) {
+	//	Barrier(res.Get(),
+	//		D3D12_RESOURCE_STATE_RENDER_TARGET,
+	//		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	//}
+
 	//バックバッファのインデックスを取得する
 	auto bbIdx=_swapchain->GetCurrentBackBufferIndex();
 
@@ -562,7 +581,14 @@ Dx12Wrapper::Flip() {
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
 
-	ExecuteAccumulatedCommand();
+	_cmdList->Close();
+	ID3D12CommandList* cmds[] = { _cmdList.Get() };
+	_cmdQue->ExecuteCommandLists(1, cmds);
+	
+	WaitForCommandQueue();
+
+	_cmdAlloc->Reset();
+	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
 
 	//Present関数が、DxLibにおけるScreenFlipみたいなもんです。
 	//Presentの第一引数が「何回垂直同期を待つか」です。
@@ -570,18 +596,6 @@ Dx12Wrapper::Flip() {
 	//周期1/60だったんだけど、今はそんなのないので待たない
 	auto result = _swapchain->Present(0, 0);
 	assert(SUCCEEDED(result));
-}
-
-void Dx12Wrapper::ExecuteAccumulatedCommand()
-{
-	_cmdList->Close();
-	ID3D12CommandList* cmds[] = { _cmdList.Get() };
-	_cmdQue->ExecuteCommandLists(1, cmds);
-
-	WaitForCommandQueue();
-
-	_cmdAlloc->Reset();
-	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
 }
 
 void Dx12Wrapper::WaitForCommandQueue()
@@ -605,8 +619,8 @@ void Dx12Wrapper::WaitForCommandQueue()
 }
 
 void 
-Dx12Wrapper::SetFov(float angle) {
-	_fov = angle;
+Dx12Wrapper::SetFov(float fov) {
+	_fov = fov;
 }
 void 
 Dx12Wrapper::SetEyePosition(float x, float y, float z) {
@@ -783,7 +797,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 	range[4].NumDescriptors = 1;//t8
 	range[4].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	//シーン行列等
+	//セッティング
 	range[5].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;//b
 	range[5].BaseShaderRegister = 1;//
 	range[5].NumDescriptors = 1;//b1
@@ -990,7 +1004,7 @@ Dx12Wrapper::DrawShrinkTextureForBlur() {
 		vp.Height /= 2;
 		sr.bottom = sr.top + vp.Height;
 	}
-	//縮小バッファをシェーダリソースに
+	//縮小バッファをシェーダリソースにに
 	Barrier(_bloomBuffers[1].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -1002,18 +1016,17 @@ Dx12Wrapper::DrawShrinkTextureForBlur() {
 void
 Dx12Wrapper::DrawAmbientOcculusion() {
 	
-	
 	Barrier(_aoBuffer.Get(),
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);//SSAOをレンダーターゲットに遷移
+		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	Barrier(_pera1Resources[0].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);//通常の結果をテクスチャとして
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 	Barrier(_pera1Resources[1].Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);//法線をテクスチャとして
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 	auto rtvBaseHandle = _aoRTVDH->GetCPUDescriptorHandleForHeapStart();
 	
@@ -1037,10 +1050,6 @@ Dx12Wrapper::DrawAmbientOcculusion() {
 	_cmdList->SetDescriptorHeaps(1, _depthSRVHeap.GetAddressOf());
 	auto srvDSVHandle = _depthSRVHeap->GetGPUDescriptorHandleForHeapStart();
 	_cmdList->SetGraphicsRootDescriptorTable(3, srvDSVHandle);
-
-	_cmdList->SetDescriptorHeaps(1, _sceneHeap.GetAddressOf());
-	auto sceneHandle = _sceneHeap->GetGPUDescriptorHandleForHeapStart();
-	_cmdList->SetGraphicsRootDescriptorTable(5, sceneHandle);
 
 	_cmdList->SetPipelineState(_aoPipeline.Get());
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -1086,11 +1095,54 @@ Dx12Wrapper::Draw(shared_ptr<PMDRenderer> renderer) {
 	_cmdList->SetDescriptorHeaps(1, _aoSRVDH.GetAddressOf());
 	_cmdList->SetGraphicsRootDescriptorTable(4, _aoSRVDH->GetGPUDescriptorHandleForHeapStart());
 
+	//セッティング
+	_cmdList->SetDescriptorHeaps(1, _postSettingDH.GetAddressOf());
+	_cmdList->SetGraphicsRootDescriptorTable(5, _postSettingDH->GetGPUDescriptorHandleForHeapStart());
+
 
 	_cmdList->SetPipelineState(_peraPipeline.Get());
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	_cmdList->IASetVertexBuffers(0, 1, &_peraVBV);
 	_cmdList->DrawInstanced(4, 1, 0, 0);
+}
+
+bool
+Dx12Wrapper::CreatePostSetting() {
+	auto bufferSize = AligmentedValue(sizeof(PostSetting), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	//まずはバッファ作る
+	auto result = _dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(_postSettingResource.ReleaseAndGetAddressOf()));
+	if (!CheckResult(result)) {
+		return false;
+	}
+	//デスクリプタヒープ
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	desc.NodeMask = 0;
+	desc.NumDescriptors = 1;
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	result = _dev->CreateDescriptorHeap(&desc, IID_PPV_ARGS(_postSettingDH.ReleaseAndGetAddressOf()));
+	if (!CheckResult(result)) {
+		return false;
+	}
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = _postSettingResource->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = bufferSize;
+
+	_dev->CreateConstantBufferView(&cbvDesc, _postSettingDH->GetCPUDescriptorHandleForHeapStart());
+
+	result = _postSettingResource->Map(0, nullptr, (void**)&_mappedPostSetting);
+	if (!CheckResult(result)) {
+		return false;
+	}
+	return true;
+
 }
 
 void Dx12Wrapper::SetCameraSetting()
@@ -1109,11 +1161,16 @@ void Dx12Wrapper::SetCameraSetting()
 		1.0f,
 		100.0f);
 	XMVECTOR det;
-	_mappedScene->invproj = XMMatrixInverse(&det, _mappedScene->view*_mappedScene->proj);
+	_mappedScene->invproj = XMMatrixInverse(&det,_mappedScene->proj);
 	auto plane = XMFLOAT4(0, 1, 0, 0);//平面
 	XMVECTOR planeVec = XMLoadFloat4(&plane);
-	auto light = XMFLOAT4(-1, 1, -1, 0);
-	XMVECTOR lightVec = XMLoadFloat4(&light);
+
+	_mappedScene->lightVec.x = _lightVec.x;
+	_mappedScene->lightVec.y = _lightVec.y;
+	_mappedScene->lightVec.z = _lightVec.z;
+	_mappedScene->isSelfShadow = _isSelfShadow;
+
+	XMVECTOR lightVec = -XMLoadFloat3(&_lightVec);
 	_mappedScene->shadow = XMMatrixShadow(planeVec, lightVec);
 
 	float armLength;//カメラアーム長(視点から注視点の長さ)
@@ -1952,6 +2009,7 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	D3D12_CLEAR_VALUE clearValue = {};
 	clearValue.Color[0] = clearValue.Color[1] = clearValue.Color[2] = 0.5f;
 	clearValue.Color[3] = 1.0f;
+	copy(begin(clearValue.Color), end(clearValue.Color),begin(_bgColor));
 	clearValue.Format = resDesc.Format;
 	HRESULT result = S_OK;
 	for (auto& res : _pera1Resources) {
@@ -2056,4 +2114,50 @@ Dx12Wrapper::CreatePera1ResourceAndView() {
 	_dev->CreateShaderResourceView(_aoBuffer.Get(),	&srvDesc,handle);
 	return true;
 
+}
+
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::CreateDescriptorHeapForImgui() {
+	ComPtr<ID3D12DescriptorHeap> ret;
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	desc.NodeMask = 0;
+	desc.NumDescriptors = 1;
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	_dev->CreateDescriptorHeap(&desc, IID_PPV_ARGS(ret.ReleaseAndGetAddressOf()));
+	return ret;
+}
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::GetHeapForImgui() {
+	return _heapForImgui;
+}
+
+
+void 
+Dx12Wrapper::SetDebugDisplay(bool flg) {
+	_mappedPostSetting->isDebugDisp = flg;
+}
+void 
+Dx12Wrapper::SetSSAO(bool flg) {
+}
+void 
+Dx12Wrapper::SetSelfShadow(bool flg) {
+	_isSelfShadow = flg;
+}
+
+void 
+Dx12Wrapper::SetLightVector(float vec[3]) {
+	_lightVec.x = vec[0];
+	_lightVec.y = vec[1];
+	_lightVec.z = vec[2];
+	SetCameraSetting();
+}
+void 
+Dx12Wrapper::SetBackColor(float col[4]) {
+	copy_n(col, 4,begin(_bgColor));
+}
+void 
+Dx12Wrapper::SetBloomColor(float col[3]) {
 }

@@ -15,6 +15,7 @@
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"DirectXTex.lib")
+#pragma comment(lib,"dxguid.lib")
 
 
 using namespace DirectX;
@@ -308,8 +309,9 @@ Dx12Wrapper::ProjMatrix()const {
 	return _mappedScene->proj;
 }
 
-ComPtr<ID3D12DescriptorHeap> 
-Dx12Wrapper::CreateDescriptorHeapForImgUi() {
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::CreateOneDescriptorHeapSRV()
+{
 	ComPtr<ID3D12DescriptorHeap> ret;
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -319,6 +321,18 @@ Dx12Wrapper::CreateDescriptorHeapForImgUi() {
 	_dev->CreateDescriptorHeap(&desc, IID_PPV_ARGS(ret.ReleaseAndGetAddressOf()));
 	return ret;
 }
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::CreateDescriptorHeapForImgUi() {
+	return CreateOneDescriptorHeapSRV();
+}
+
+
+ComPtr<ID3D12DescriptorHeap>
+Dx12Wrapper::CreateDescriptorHeapForSpriteFont() {
+	return CreateOneDescriptorHeapSRV();
+}
+
 
 bool 
 Dx12Wrapper::CreatePeraVertex() {
@@ -2221,4 +2235,17 @@ Dx12Wrapper::DrawToPera2() {
 void 
 Dx12Wrapper::SetAO(bool aoFlg) {
 	_mappedPostSetting->aoFlg = aoFlg;
+}
+
+
+D3D12_VIEWPORT
+Dx12Wrapper::GetViewPort()const {
+	auto wsize = Application::Instance().GetWindowSize();
+	D3D12_VIEWPORT vp;
+	vp.TopLeftX = vp.TopLeftY = 0;
+	vp.Width = wsize.width;
+	vp.Height = wsize.height;
+	vp.MinDepth = 0.0f;
+	vp.MaxDepth = 1.0f;
+	return vp;
 }

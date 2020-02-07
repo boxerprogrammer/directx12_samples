@@ -1,106 +1,90 @@
-//SSAO処理のためだけのシェーダ
-Texture2D<float4> normtex:register(t1);//1パス目の法線描画
-Texture2D<float> depthtex:register(t6);//1パス目の深度テクスチャ
+Texture2D<float4> texNorm : register(t1);//法線
+//深度値実験用
+Texture2D<float> depthTex : register(t4);//デプス
 
-SamplerState smp:register(s0);
+SamplerState smp : register(s0);
 
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 pos: SV_POSITION;
-	float2 uv:TEXCOORD;
+cbuffer PostSetting : register(b1) {
+	int outline;
+	int rimFlg;
+	float rimStrength;
+	int debugDispFlg;
+	int normOutline;
+	int directionalLightFlg;
+	int aaFlg;
+	int bloomFlg;
+	int dofFlg;
+	int aoFlg;
+	int tryCount;
+	float aoRadius;
+	float4 bloomColor;
+	float2 focusPos;
 };
 
-//元座標復元に必要
-cbuffer sceneBuffer : register(b1) {
+//プロジェクションと逆プロジェクションのため
+cbuffer sceneBuffer : register(b2) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
-	matrix invproj;//逆プロジェクション
+	matrix invProj;//逆プロジェクション
 	matrix lightCamera;//ライトビュープロジェ
 	matrix shadow;//影行列
 	float3 eye;//視点
 };
 
-//現在のUV値を元に乱数を返す
 float random(float2 uv) {
-	return frac(sin(dot(uv, float2(12.9898f, 78.233f)))*43758.5453f);
+	return frac(sin(dot(uv, float2(12.9898, 78.233)))*43758.5453);
 }
-//SSAO(乗算用の明度のみ情報を返せればよい)
-float SsaoPs(Output input) : SV_Target
-{
-	//matrix<float,2,3> mat;
-	//float2x3 mat2;
-	float4x4 mat;
-	mat._11_12_13_14 = float4(1.0f, 2.0f, 3.0f, 4.0f);
+struct Input {
+	float4 pos: SV_POSITION;
+	float2 uv:TEXCOORD;
+};
+//スクリーンスペースアンビエントオクルージョン用
+float SsaoPS(Input input) :SV_TARGET{
+	float w,h,mip;
+	depthTex.GetDimensions(0,w, h, mip);
 
-	float dp = depthtex.Sample(smp, input.uv);//現在のUVの深度
+	float dx = 1.0f / w, dy = 1.0f / h;
+	float dp = depthTex.Sample(smp, input.uv);
+	float4 pos = float4(input.uv,dp,1);
+	//①元の座標の復元
+	pos.xy = pos.xy*float2(2, -2) + float2(-1, 1);
+	pos = mul(invProj, pos);
+	pos /= pos.w;//同次座標で割るのを忘れずに
 
-	float w, h, miplevels;
-	depthtex.GetDimensions(0, w, h, miplevels);
-	float dx = 1.0f / w;
-	float dy = 1.0f / h;
-
-	//SSAO
-	//元の座標を復元する
-	float4 respos = mul(invproj, float4(input.uv*float2(2, -2) + float2(-1, 1), dp, 1));
-	respos.xyz = respos.xyz / respos.w;
-	float div = 0.0f;
-	float ao = 0.0f;
-	float3 norm = normalize((normtex.Sample(smp, input.uv).xyz * 2) - 1);
-	const int trycnt = 256;
-	const float radius = 0.5f;
+	float ao = 0.0;//当たった時だけ加算される
+	float accum = 0.0;//πに当たるやつ(すべて1だった時の総和)
+	const int trycnt = tryCount%400;
+	const float radius = aoRadius;
 	if (dp < 1.0f) {
+		float4 norm = texNorm.Sample(smp, input.uv);
+		norm.xyz = norm.xyz * 2 - 1;
 		for (int i = 0; i < trycnt; ++i) {
-			float rnd1 = random(float2(i*dx, i*dy)) * 2 - 1;
-			float rnd2 = random(float2(rnd1, i*dy)) * 2 - 1;
-			float rnd3 = random(float2(rnd2, rnd1)) * 2 - 1;
-			float3 omega = normalize(float3(rnd1,rnd2,rnd3));
-			omega = normalize(omega);
-			//乱数の結果法線の反対側に向いてたら反転する
-			float dt = dot(norm, omega);
-			float sgn = sign(dt);
-			omega *= sign(dt);
-			//結果の座標を再び射影変換する
-			float4 rpos = mul(proj, float4(respos.xyz + omega * radius, 1));
-			rpos.xyz /= rpos.w;
+			//②ランダムな方向のベクトルωを作る
+			float rndX = random(input.uv / 2.0f + float2((float)i*dx, (float)i*dy) / 2.0f);
+			float rndY = random(input.uv / 2.0f + float2(rndX, i*dy) / 2.0f);
+			float rndZ = random(float2(rndX, rndY));
+
+			//③法線ベクトルを取得し、ランダム方向ベクトルと内積を取り
+			//法線の反対側を向いてたら反転する
+
+			float3 omega = normalize(float3(rndX, rndY, rndZ) * 2 - 1);
+			float dt = dot(normalize(norm.xyz), omega);//内積=cosθ
+			if (dt == 0.0f)continue;
+			float sgn = sign(dt);//内積の符号を判別
+			omega *= sgn;//法線の反対球に入ってたら法線側の半球に持ってくる
 			dt *= sgn;
-			div += dt;
-			//計算結果が現在の場所の深度より奥に入ってるなら遮蔽されているという事なので加算
-			ao += step(depthtex.Sample(smp, (rpos.xy + float2(1, -1))*float2(0.5f, -0.5f)), rpos.z)*dt;
+			//現在の座標にランダムベクトルを加算
+			//④この座標がどこかにめり込んでるかどうかを調査する
+			float4 rpos = mul(proj, float4(pos.xyz + omega * radius,1));
+			rpos /= rpos.w;
+			rpos.xy = (rpos.xy + float2(1, -1))*float2(0.5, -0.5);
+
+			ao += step(depthTex.Sample(smp, rpos.xy), rpos.z)*dt;
+			accum += dt;
 		}
-		ao /= div;
+		ao /= accum;
 	}
-	return 1.0f - ao;
+	return 1 - ao;
+
+
 }
-
-
-//SSAO
-//float SsaoPs(Output input) : SV_Target
-//{
-//	float dp = depthtex.Sample(smp, input.uv);//現在のUVの深度
-//
-//	SSAO
-//	元の座標を復元する
-//	float4 respos = mul(invproj, float4(input.uv*float2(2, -2) + float2(-1, 1), dp, 1));
-//	respos.xyz = respos.xyz / respos.w;
-//	
-//	float oc = 0.0f;
-//	float3 norm = normalize((normtex.Sample(smp, input.uv).xyz * 2) - 1);
-//	
-//	if (dp < 1.0f) {
-//		for (int i = 0; i < 256; ++i) {
-//			float3 omega = (float3(random(input.uv + float2(i / 100.0f, i / 50.0f)) * 2 - 1,
-//				random(input.uv + float2(0.3 + i / 512.0f + 0 / 36000.0f, 0.2 + i / 64.0f)) * 2 - 1,
-//				random(input.uv + float2(0.2 + i / 32.0f + 0 / 36000.0f, i / 512.0f)) * 2 - 1));
-//			omega = normalize(omega);
-//			float dt = dot(norm, omega);
-//			float sgn = sign(dt);
-//			omega *= sign(dt);
-//			float4 rpos = mul(proj, mul(view,float4(respos.xyz + omega, 1)));
-//			rpos.xyz /= rpos.w;
-//			oc += step(depthtex.Sample(smp, (rpos.xy + float2(1, -1))*float2(0.5, -0.5)), rpos.z)*dot(norm, omega);
-//		}
-//		oc /= 256.0f;
-//	}
-//	return 1.0f - oc;
-//
-//}

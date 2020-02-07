@@ -22,9 +22,11 @@ Texture2D<float> lightDepthTex : register(t4);
 cbuffer sceneBuffer : register(b1) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
+	matrix invproj;//プロジェクション
 	matrix lightCamera;//ライトビュープロジェ
 	matrix shadow;//影行列
 	float3 eye;//視点
+	
 };
 
 //アクター座標変換用スロット
@@ -138,13 +140,6 @@ PixelOutput PS(Output input) {
 	float4 sphCol = sph.Sample(smp, spUV);
 	float4 spaCol = spa.Sample(smp, spUV);
 
-	//↓ディファードシェーディング実験用コード↓
-	//PixelOutput output;
-	//output.col = float4(spaCol+sphCol*texCol*diffuse);
-	//output.normal.rgb = float3((input.normal.xyz + 1.0f) / 2.0f);
-	//output.normal.a = 1;
-	//return output;
-
 	//ディフューズ明るさ		
 	float diffB = dot(-light, input.normal);
 	float4 toonCol = toon.Sample(clutSmp, float2(0, 1 - diffB));
@@ -153,8 +148,6 @@ PixelOutput PS(Output input) {
 	float4 ret = float4((spaCol + sphCol * texCol * toonCol*diffuse).rgb,diffuse.a)
 		+ float4(specular*specB, 1);
 	
-	
-
 	float shadowWeight = 1.0f;
 	float3 posFromLightVP=input.tpos.xyz / input.tpos.w;
 	float2 shadowUV = (posFromLightVP +float2(1,-1))*float2(0.5,-0.5);
@@ -162,7 +155,7 @@ PixelOutput PS(Output input) {
 		shadowSmp, 
 		shadowUV, 
 		posFromLightVP.z-0.005f);
-	shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
+	//shadowWeight = lerp(0.5f, 1.0f, depthFromLight);
 	
 	PixelOutput output;
 	output.col = float4(ret.rgb*shadowWeight, ret.a);
@@ -185,6 +178,4 @@ shadowVS(float4 pos:POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min1
 	return  mul(lightCamera, pos);
 }
 
-void
-shadowPS(float4 pos:SV_POSITION) {
-}
+

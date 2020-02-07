@@ -8,6 +8,7 @@
 #include<wrl.h>
 #include<unordered_map>
 #include<memory>
+#include<array>
 
 class PMDActor;
 class PMDRenderer;
@@ -41,6 +42,9 @@ private:
 	ComPtr<ID3D12Resource> _depthBuffer;
 	//深度バッファビュー用スクリプタヒープ
 	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+	//シャドウマップ用深度バッファ
+	ComPtr<ID3D12Resource> _lightDepthBuffer;
+	
 
 	bool CreateDepthBuffer();
 	bool CreateDSV();
@@ -86,7 +90,8 @@ private:
 	struct SceneMatrix {
 		DirectX::XMMATRIX view;//ビュー
 		DirectX::XMMATRIX proj;//プロジェクション
-		DirectX::XMMATRIX shadow;//影
+		DirectX::XMMATRIX lightCamera;//ライトから見たビュー
+		DirectX::XMMATRIX shadow;//影行列
 		DirectX::XMFLOAT3 eye;//視点
 	};
 	SceneMatrix* _mappedScene;
@@ -97,40 +102,25 @@ private:
 	DirectX::XMFLOAT3 _eye;
 	DirectX::XMFLOAT3 _target;
 	DirectX::XMFLOAT3 _up;
-	//平行ライトの向き
-	DirectX::XMFLOAT3 _parallelLightVec;
-
-	float _fov = DirectX::XM_PI/6;//デフォルト30°
+	float _fov = DirectX::XM_PI/6;
 
 	bool CreateCommandList();
 	void Barrier(ID3D12Resource* p,
 		D3D12_RESOURCE_STATES before, 
 		D3D12_RESOURCE_STATES after);
 
-	//歪みテクスチャ用
-	ComPtr<ID3D12DescriptorHeap> _distortionSRVHeap;
-	ComPtr<ID3D12Resource> _distortionTexBuffer;
-	bool CreateEffectBufferAndView();
-
+	//std::vector<PMDActor*> _actors;
 
 	//1枚目レンダリング用
 	//いわゆるペラポリに張り付けるための絵の
 	//メモリリソースとそのビュー
 	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
-	ComPtr<ID3D12DescriptorHeap> _peraRegisterHeap;
-	ComPtr<ID3D12Resource> _peraResource;
+	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
+	std::array<ComPtr<ID3D12Resource>,2> _pera1Resources;
 	//１枚目ペラポリのためのリソースとビューを
 	//作成
-	bool CreatePeraResourcesAndView();
-
-	ComPtr<ID3D12Resource> _bokehParamResource;
-	//ボケに関するバッファを作り中にボケパラメータを代入する
-	bool CreateBokehParamResource();
-
-	//ペラポリ2枚目
-	ComPtr<ID3D12Resource> _peraResource2;
-	ComPtr<ID3D12PipelineState> _peraPipeline2;
-
+	bool CreatePera1ResourceAndView();
+	
 	//ペラポリ用頂点バッファ(N字の4点)
 	ComPtr<ID3D12Resource> _peraVB;
 	D3D12_VERTEX_BUFFER_VIEW _peraVBV;
@@ -139,8 +129,41 @@ private:
 	ComPtr<ID3D12PipelineState> _peraPipeline;
 	ComPtr<ID3D12RootSignature> _peraRS;
 
-	bool CreatePeraVertex();
-	bool CreatePeraPipeline();
+	
+
+
+	//ペラポリに投げる定数バッファ
+	ComPtr<ID3D12Resource> _peraCB;
+	ComPtr<ID3D12DescriptorHeap> _peraCBVHeap;
+	bool CreateConstantBufferForPera();
+
+	//歪み用ノーマルマップ
+	ComPtr<ID3D12Resource> _distBuff;
+	ComPtr<ID3D12DescriptorHeap> _distSRVHeap;
+	//深度値テクスチャ用
+	ComPtr<ID3D12DescriptorHeap> _depthSRVHeap;
+	bool CreateDistortion();
+	bool CreateDepthSRV();
+
+	//プリミティブ用頂点バッファ
+	std::vector<ComPtr<ID3D12Resource>> _primitivesVB;
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> _primitivesVBV;
+
+	//プリミティブ用インデックスバッファ
+	std::vector<ComPtr<ID3D12Resource>> _primitivesIB;
+	std::vector<D3D12_INDEX_BUFFER_VIEW> _primitivesIBV;
+	bool CreatePrimitives();
+	
+	ComPtr<ID3D12RootSignature> _primitveRS;
+	ComPtr<ID3D12PipelineState> _primitivePipeline;
+	bool CreatePrimitivePipeline();
+	bool CreatePrimitiveRootSignature();
+	
+	ComPtr<ID3D12PipelineState> _blurPipeline;//画面全体ぼかし用パイプライン
+	std::array<ComPtr<ID3D12Resource>, 2> _bloomBuffers;//ブルーム用バッファ
+	ComPtr<ID3D12Resource> _dofBuffer;//被写界深度用ぼかしバッファ
+	bool CreateBloomBuffer();
+	bool CreateBlurForDOFBuffer();
 
 public:
 	Dx12Wrapper(HWND hwnd);
@@ -152,6 +175,10 @@ public:
 	ID3D12GraphicsCommandList* CmdList() {
 		return _cmdList.Get();
 	}
+	ID3D12CommandQueue* CmdQue() {
+		return _cmdQue.Get();
+	}
+
 
 	bool Init();
 	bool CreateRenderTargetView();
@@ -161,21 +188,27 @@ public:
 	ComPtr<ID3D12Resource> GradTexture();
 
 
+
+	bool CreatePeraVertex();
+	bool CreatePeraPipeline();
+
+	//ライトからの描画(影用)の準備
+	bool PreDrawShadow();
+
 	//ペラポリゴンへの描画準備
 	bool PreDrawToPera1();
-	//ペラポリゴンへの描画後処理
-	void PostDrawToPera1();
 
 	//ペラポリゴンへの描画
+	///プリミティブ形状(平面、円柱、円錐、球)を描画
+	void DrawPrimitiveShapes();
 	void DrawToPera1(std::shared_ptr<PMDRenderer> renderer);
 
+	void DrawShrinkTextureForBlur();
 	//画面のクリア
 	bool Clear();
 
 	//描画
 	void Draw(std::shared_ptr<PMDRenderer> renderer);
-
-	void DrawHorizontalBokeh();
 
 	void SetCameraSetting();
 
