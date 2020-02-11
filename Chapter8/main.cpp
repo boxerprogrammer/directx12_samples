@@ -377,7 +377,7 @@ void CreateGameWindow(HWND &hwnd,WNDCLASSEX &windowClass){
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);//ウィンドウのサイズはちょっと面倒なので関数を使って補正する
 	//ウィンドウオブジェクトの生成
 	hwnd = CreateWindow(windowClass.lpszClassName,//クラス名指定
-		_T("DX12マテリアル反映"),//タイトルバーの文字
+		_T("DX12 マテリアル反映"),//タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,//タイトルバーと境界線があるウィンドウです
 		CW_USEDEFAULT,//表示X座標はOSにお任せします
 		CW_USEDEFAULT,//表示Y座標はOSにお任せします
@@ -891,8 +891,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3DBlob* _psBlob = nullptr;
 
 	ID3DBlob* errorBlob = nullptr;
-	result = D3DCompileFromFile(L"BasicShader.hlsl",
-		nullptr, nullptr,
+	result = D3DCompileFromFile(L"BasicVertexShader.hlsl",
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"BasicVS", "vs_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &_vsBlob, &errorBlob);
@@ -909,8 +909,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		exit(1);//行儀悪いかな…
 	}
-	result = D3DCompileFromFile(L"BasicShader.hlsl",
-		nullptr, nullptr,
+	result = D3DCompileFromFile(L"BasicPixelShader.hlsl",
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &_psBlob, &errorBlob);
