@@ -78,7 +78,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);//ウィンドウのサイズはちょっと面倒なので関数を使って補正する
 	//ウィンドウオブジェクトの生成
 	HWND hwnd = CreateWindow(w.lpszClassName,//クラス名指定
-		_T("DX12テスト"),//タイトルバーの文字
+		_T("DX12 単純ポリゴンテスト"),//タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,//タイトルバーと境界線があるウィンドウです
 		CW_USEDEFAULT,//表示X座標はOSにお任せします
 		CW_USEDEFAULT,//表示Y座標はOSにお任せします
@@ -259,7 +259,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3DBlob* _psBlob = nullptr;
 
 	ID3DBlob* errorBlob = nullptr;
-	result = D3DCompileFromFile(L"BasicShader.hlsl",
+	result = D3DCompileFromFile(L"BasicVS.hlsl",
 		nullptr, nullptr, 
 		"BasicVS", "vs_5_0", 
 		D3DCOMPILE_DEBUG| D3DCOMPILE_SKIP_OPTIMIZATION,
@@ -277,7 +277,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		exit(1);//行儀悪いかな…
 	}
-	result = D3DCompileFromFile(L"BasicShader.hlsl",
+	result = D3DCompileFromFile(L"BasicPS.hlsl",
 		nullptr, nullptr,
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
