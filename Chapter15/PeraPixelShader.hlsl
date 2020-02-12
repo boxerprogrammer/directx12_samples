@@ -1,3 +1,4 @@
+#include"Type.hlsli"
 Texture2D<float4> tex : register(t0);//通常カラー
 Texture2D<float4> texNormal : register(t1);//法線
 Texture2D<float4> texHighLum : register(t2);//高輝度
@@ -21,14 +22,6 @@ cbuffer Weights : register(b0) {
 	//せざるを得ないため↓のような書き方になる
 	float4 wgts[2];
 };
-
-
-
-struct Output {
-	float4 pos: SV_POSITION;
-	float2 uv:TEXCOORD;
-};
-
 
 
 float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,float dx,float dy,float4 rect){
@@ -81,7 +74,7 @@ float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,floa
 	) / 256.0f, ret.a);
 }
 
-float4 PeraPS(Output input) : SV_TARGET{
+float4 PeraPS(PeraType input) : SV_TARGET{
 	if (input.uv.x<0.2&&input.uv.y < 0.2) {//深度出力
 		float depth = depthTex.Sample(smp, input.uv*5);
 		depth = 1.0f - pow(depth, 30);
@@ -102,7 +95,7 @@ float4 PeraPS(Output input) : SV_TARGET{
 	return float4(col.rgb*texSSAO.Sample(smp, input.uv),col.a);
 }
 
-float4 VerticalBlurPS(Output input) : SV_TARGET{
+float4 VerticalBlurPS(PeraType input) : SV_TARGET{
 	float w,h,miplevels;
 	tex.GetDimensions(0, w, h, miplevels);
 	float dx = 1.0 / w;
@@ -116,13 +109,10 @@ float4 VerticalBlurPS(Output input) : SV_TARGET{
 	return float4(ret,col.a);
 }
 
-struct BlurOutput {
-	float4 highLum:SV_TARGET0;//高輝度(High Luminance)
-	float4 col:SV_TARGET1;//通常のレンダリング結果
-};
+
 
 //メインテクスチャを5x5ブラーでぼかすピクセルシェーダ
-BlurOutput BlurPS(Output input)
+BlurOutput BlurPS(PeraType input)
 {
 	float w,h,miplevels;
 	tex.GetDimensions(0, w, h, miplevels);

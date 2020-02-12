@@ -1,14 +1,10 @@
+#include"Type.hlsli"
+
 //SSAO処理のためだけのシェーダ
 Texture2D<float4> normtex:register(t1);//1パス目の法線描画
 Texture2D<float> depthtex:register(t6);//1パス目の深度テクスチャ
 
 SamplerState smp:register(s0);
-
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 pos: SV_POSITION;
-	float2 uv:TEXCOORD;
-};
 
 //元座標復元に必要
 cbuffer sceneBuffer : register(b1) {
@@ -25,7 +21,7 @@ float random(float2 uv) {
 	return frac(sin(dot(uv, float2(12.9898f, 78.233f)))*43758.5453f);
 }
 //SSAO(乗算用の明度のみ情報を返せればよい)
-float SsaoPS(Output input) : SV_Target
+float SsaoPS(PeraType input) : SV_Target
 {
 	float dp = depthtex.Sample(smp, input.uv);//現在のUVの深度
 

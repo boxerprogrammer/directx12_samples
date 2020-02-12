@@ -8,6 +8,7 @@ struct BasicType {
 	float instNo : INSTNO;
 };
 
+
 struct PrimitiveType {
 	float4 svpos:SV_POSITION;
 	float4 tpos : TPOS;

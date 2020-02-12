@@ -1,3 +1,4 @@
+#include"Type.hlsli"
 SamplerState smp : register(s0);
 SamplerState clutSmp : register(s1);
 SamplerComparisonState shadowSmp : register(s2);
@@ -19,7 +20,7 @@ Texture2D<float4> toon : register(t3);//トゥーンテクスチャ
 Texture2D<float> lightDepthTex : register(t4);
 
 //シーン管理用スロット
-cbuffer sceneBuffer : register(b1) {
+cbuffer SceneBuffer : register(b1) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
 	matrix invproj;//プロジェクション
@@ -30,40 +31,17 @@ cbuffer sceneBuffer : register(b1) {
 };
 
 //アクター座標変換用スロット
-cbuffer transBuffer : register(b2) {
+cbuffer TransBuffer : register(b2) {
 	matrix world;
 }
 
 //ボーン行列配列
-cbuffer transBuffer : register(b3) {
+cbuffer BonesBuffer : register(b3) {
 	matrix bones[512];
 }
 
-
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 svpos : SV_POSITION;
-	float4 pos : POSITION;
-	float4 tpos : TPOS;
-	float4 normal : NORMAL;
-	float2 uv : TEXCOORD;
-	float instNo : INSTNO;
-};
-
-struct PixelOutput {
-	float4 col:SV_TARGET0;//通常のレンダリング結果
-	float4 normal:SV_TARGET1;//法線
-	float4 highLum:SV_TARGET2;//高輝度(High Luminance)
-};
-
-struct PrimitiveOutput {
-	float4 svpos:SV_POSITION;
-	float4 tpos : TPOS;
-	float4 normal:NORMAL;
-};
-
-PrimitiveOutput PrimitiveVS(float4 pos:POSITION, float4 normal : NORMAL) {
-	PrimitiveOutput output;
+PrimitiveType PrimitiveVS(float4 pos:POSITION, float4 normal : NORMAL) {
+	PrimitiveType output;
 	output.svpos = mul(proj, mul(view, pos));
 	output.tpos = mul(lightCamera, pos);
 	output.normal = normal;
@@ -71,9 +49,9 @@ PrimitiveOutput PrimitiveVS(float4 pos:POSITION, float4 normal : NORMAL) {
 }
 //頂点シェーダ(頂点情報から必要なものを次の人へ渡す)
 //パイプラインに投げるためにはSV_POSITIONが必要
-Output BasicVS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo:SV_InstanceID) {
+BasicType BasicVS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo:SV_InstanceID) {
 	//1280,720を直で使って構わない。
-	Output output;
+	BasicType output;
 	float fWeight = float(weight) / 100.0f;
 	matrix conBone = bones[boneno.x]*fWeight + 
 						bones[boneno.y]*(1.0f - fWeight);

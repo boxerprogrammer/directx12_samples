@@ -1,9 +1,10 @@
+#include"Type.hlsli"
 SamplerState smp : register(s0);
 SamplerState clutSmp : register(s1);
 SamplerComparisonState shadowSmp : register(s2);
 
 //マテリアル用スロット
-cbuffer materialBuffer : register(b0) {
+cbuffer MaterialBuffer : register(b0) {
 	float4 diffuse;
 	float power;
 	float3 specular;
@@ -19,7 +20,7 @@ Texture2D<float4> toon : register(t3);//トゥーンテクスチャ
 Texture2D<float> lightDepthTex : register(t4);
 
 //シーン管理用スロット
-cbuffer sceneBuffer : register(b1) {
+cbuffer SceneBuffer : register(b1) {
 	matrix view;//ビュー
 	matrix proj;//プロジェクション
 	matrix invproj;//プロジェクション
@@ -29,39 +30,10 @@ cbuffer sceneBuffer : register(b1) {
 	
 };
 
-//アクター座標変換用スロット
-cbuffer transBuffer : register(b2) {
-	matrix world;
-}
-
-//ボーン行列配列
-cbuffer transBuffer : register(b3) {
-	matrix bones[512];
-}
 
 
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 svpos : SV_POSITION;
-	float4 pos : POSITION;
-	float4 tpos : TPOS;
-	float4 normal : NORMAL;
-	float2 uv : TEXCOORD;
-	float instNo : INSTNO;
-};
 
-struct PixelOutput {
-	float4 col:SV_TARGET0;//通常のレンダリング結果
-	float4 normal:SV_TARGET1;//法線
-	float4 highLum:SV_TARGET2;//高輝度(High Luminance)
-};
-
-struct PrimitiveOutput {
-	float4 svpos:SV_POSITION;
-	float4 tpos : TPOS;
-	float4 normal:NORMAL;
-};
-float4 PrimitivePS(PrimitiveOutput input) : SV_TARGET{
+float4 PrimitivePS(PrimitiveType input) : SV_TARGET{
 	float3 light = normalize(float3(1,-1,1));
 	float bright = dot(input.normal, -light);
 
@@ -84,9 +56,7 @@ float4 PrimitivePS(PrimitiveOutput input) : SV_TARGET{
 
 
 //ピクセルシェーダ
-PixelOutput BasicPS(Output input) {
-
-
+PixelOutput BasicPS(BasicType input) {
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);
