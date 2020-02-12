@@ -4,8 +4,7 @@ struct BasicType {
 	float4 pos : POSITION;
 	float4 normal : NORMAL;
 	float2 uv : TEXCOORD;
-	float weight : WEIGHT;
-	float boneno : BONENO;
+	uint instNo:SV_InstanceID;
 };
 
 //ƒyƒ‰ƒ|ƒŠƒSƒ“•`‰æ—p

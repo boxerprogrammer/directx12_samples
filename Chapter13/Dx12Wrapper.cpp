@@ -529,12 +529,16 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "VS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraVertexShader.hlsl", 
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, 
+		"PeraVS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result,errBlob.Get())) {
 		assert(0);
 		return false;
 	}
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "PS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", 
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"PeraPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -566,7 +570,9 @@ Dx12Wrapper::CreatePeraPipeline() {
 		assert(0);
 		return false;
 	}
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "VerticalBokehPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", 
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, 
+		"VerticalBokehPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;

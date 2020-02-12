@@ -1,3 +1,4 @@
+#include"Type.hlsli"
 SamplerState smp : register(s0);
 SamplerState clutSmp : register(s1);
 
@@ -21,51 +22,10 @@ cbuffer sceneBuffer : register(b1) {
 	float3 eye;//視点
 };
 
-//アクター座標変換用スロット
-cbuffer transBuffer : register(b2) {
-	matrix world;
-}
-
-//ボーン行列配列
-cbuffer transBuffer : register(b3) {
-	matrix bones[512];
-}
-
-
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 svpos : SV_POSITION;
-	float4 pos : POSITION;
-	float4 normal : NORMAL;
-	float2 uv : TEXCOORD;
-	uint instNo:SV_InstanceID;
-};
-
-//頂点シェーダ(頂点情報から必要なものを次の人へ渡す)
-//パイプラインに投げるためにはSV_POSITIONが必要
-Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo: SV_InstanceID) {
-	//1280,720を直で使って構わない。
-	Output output;
-	float fWeight = float(weight) / 100.0f;
-	matrix conBone = bones[boneno.x]*fWeight + 
-						bones[boneno.y]*(1.0f - fWeight);
-	output.pos = mul(world,	mul(conBone,pos));
-	if (instNo > 0) {
-		output.pos = mul(shadow, output.pos);
-	}
-	output.svpos = mul(proj,mul(view, output.pos));
-	output.uv = uv;
-	normal.w = 0;
-	output.normal = mul(world,normal);
-	
-	output.instNo = instNo;
-	//output.uv = uv;
-	return output;
-}
 
 
 //ピクセルシェーダ
-float4 PS(Output input):SV_TARGET {
+float4 BasicPS(BasicType input):SV_TARGET {
 	if (input.instNo>0) {
 		return float4(0, 0, 0, 1);
 	}
