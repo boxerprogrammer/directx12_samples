@@ -1,4 +1,4 @@
-//モデル描画用
+
 struct BasicType {
 	float4 svpos : SV_POSITION;
 	float4 pos : POSITION;
@@ -8,7 +8,6 @@ struct BasicType {
 	float instNo : INSTNO;
 };
 
-//基本形状用
 struct PrimitiveType {
 	float4 svpos:SV_POSITION;
 	float4 tpos : TPOS;
@@ -16,8 +15,19 @@ struct PrimitiveType {
 };
 
 
+struct PixelOutput {
+	float4 col:SV_TARGET0;//通常のレンダリング結果
+	float4 normal:SV_TARGET1;//法線
+	float4 highLum:SV_TARGET2;//高輝度(High Luminance)
+};
+
 //ペラポリゴン描画用
 struct PeraType {
 	float4 pos: SV_POSITION;
 	float2 uv:TEXCOORD;
+};
+
+struct BlurOutput {
+	float4 highLum:SV_TARGET0;//高輝度(High Luminance)
+	float4 col:SV_TARGET1;//通常のレンダリング結果
 };

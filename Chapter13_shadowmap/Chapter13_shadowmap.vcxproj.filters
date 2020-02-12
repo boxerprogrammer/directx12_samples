@@ -13,6 +13,15 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Shader">
+      <UniqueIdentifier>{9585e578-ab05-48ac-aaa5-142953d38ed0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PMD">
+      <UniqueIdentifier>{ed5aa46a-0ebd-4281-91c7-e72073443bbf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Primitive">
+      <UniqueIdentifier>{7fb22ca4-f6a4-4d41-bec6-9bb76df03050}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -24,26 +33,26 @@
     <ClCompile Include="Dx12Wrapper.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="PMDActor.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="PMDRenderer.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Helper.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="PrimitiveActor.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="PMDActor.cpp">
+      <Filter>PMD</Filter>
     </ClCompile>
-    <ClCompile Include="PrimitiveRenderer.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="PlaneActor.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="PMDRenderer.cpp">
+      <Filter>PMD</Filter>
     </ClCompile>
     <ClCompile Include="CylinderActor.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Primitive</Filter>
+    </ClCompile>
+    <ClCompile Include="PlaneActor.cpp">
+      <Filter>Primitive</Filter>
+    </ClCompile>
+    <ClCompile Include="PrimitiveActor.cpp">
+      <Filter>Primitive</Filter>
+    </ClCompile>
+    <ClCompile Include="PrimitiveRenderer.cpp">
+      <Filter>Primitive</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -53,30 +62,45 @@
     <ClInclude Include="Dx12Wrapper.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="PMDActor.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="PMDRenderer.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Helper.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="PMDActor.h">
+      <Filter>PMD</Filter>
+    </ClInclude>
+    <ClInclude Include="PMDRenderer.h">
+      <Filter>PMD</Filter>
+    </ClInclude>
     <ClInclude Include="PrimitiveActor.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Primitive</Filter>
     </ClInclude>
     <ClInclude Include="PrimitiveRenderer.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="PlaneActor.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Primitive</Filter>
     </ClInclude>
     <ClInclude Include="CylinderActor.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Primitive</Filter>
+    </ClInclude>
+    <ClInclude Include="PlaneActor.h">
+      <Filter>Primitive</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="BasicShader.hlsl" />
-    <FxCompile Include="pera.hlsl" />
+    <FxCompile Include="BasicPixelShader.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="BasicVertexShader.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="PeraPixelShader.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="PeraVertexShader.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Type.hlsli">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
 </Project>

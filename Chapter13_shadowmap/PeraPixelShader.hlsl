@@ -1,12 +1,15 @@
-Texture2D<float4> tex : register(t0);
-Texture2D<float4> distTex : register(t1);
+#include"Type.hlsli"
+
+
+SamplerState smp : register(s0);
+Texture2D<float4> tex : register(t0);//通常テクスチャ
+Texture2D<float4> distTex : register(t1);//歪みテクスチャ
 
 //深度値検証用
 Texture2D<float> depthTex : register(t2);//デプス
 Texture2D<float> lightDepthTex : register(t3);//ライトデプス
 
 
-SamplerState smp : register(s0);
 cbuffer Weights : register(b0) {
 	//CPUからfloat[8]で渡されたものを
 	//正しく受け取ろうとするとfloat4[2]に
@@ -15,19 +18,7 @@ cbuffer Weights : register(b0) {
 };
 
 
-struct Output {
-	float4 pos: SV_POSITION;
-	float2 uv:TEXCOORD;
-};
-
-Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
-	Output output;
-	output.pos = pos;
-	output.uv = uv;
-	return output;
-}
-
-float4 PS(Output input) : SV_TARGET{
+float4 PeraPS(PeraType input) : SV_TARGET{
 	//if (input.uv.x<0.2&&input.uv.y < 0.2) {
 	//	float depth = depthTex.Sample(smp, input.uv*5);
 	//	depth = 1.0f - pow(depth, 30);
@@ -71,7 +62,7 @@ float4 PS(Output input) : SV_TARGET{
 	return float4(float3(1,1,1)-col.rgb,col.a);
 }
 
-float4 VerticalBlurPS(Output input) : SV_TARGET{
+float4 VerticalBlurPS(PeraType input) : SV_TARGET{
 		float w,h,miplevels;
 	tex.GetDimensions(0, w, h, miplevels);
 	float dx = 1.0 / w;
