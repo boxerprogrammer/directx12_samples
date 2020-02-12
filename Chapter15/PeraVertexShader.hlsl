@@ -81,7 +81,7 @@ float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,floa
 	) / 256.0f, ret.a);
 }
 
-Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
+Output PeraVS(float4 pos:POSITION, float2 uv : TEXCOORD) {
 	Output output;
 	output.pos = pos;
 	output.uv = uv;

@@ -849,12 +849,12 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "VS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PeraVS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result,errBlob.Get())) {
 		assert(0);
 		return false;
 	}
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "PS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PeraPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -889,7 +889,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 		return false;
 	}
 
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, nullptr, "BlurPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "BlurPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -906,7 +906,7 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 
 	//SSAO用
-	result = D3DCompileFromFile(L"ssao.hlsl", nullptr, nullptr, "SsaoPs", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"SSAOPixelShader.hlsl", nullptr, nullptr, "SsaoPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -1432,7 +1432,7 @@ Dx12Wrapper::CreatePrimitivePipeline() {
 	ID3DBlob* vsBlob = nullptr;
 	ID3DBlob* errBlob = nullptr;
 	auto result = D3DCompileFromFile(
-		L"BasicShader.hlsl",//シェーダファイルパス
+		L"BasicVertexShader.hlsl",//シェーダファイルパス
 		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
 		nullptr,//インクルード定義(ID3DIncludeのポインタ)
 		"PrimitiveVS",//エントリポイント関数名
@@ -1447,7 +1447,7 @@ Dx12Wrapper::CreatePrimitivePipeline() {
 
 	ID3DBlob* psBlob = nullptr;
 	result = D3DCompileFromFile(
-		L"BasicShader.hlsl",
+		L"BasicPixelShader.hlsl",
 		nullptr, nullptr,
 		"PrimitivePS", "ps_5_0",
 		0, 0, &psBlob, &errBlob);

@@ -88,7 +88,7 @@ Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
 	return output;
 }
 
-float4 PS(Output input) : SV_TARGET{
+float4 PeraPS(Output input) : SV_TARGET{
 	if (input.uv.x<0.2&&input.uv.y < 0.2) {//[“xo—Í
 		float depth = depthTex.Sample(smp, input.uv*5);
 		depth = 1.0f - pow(depth, 30);

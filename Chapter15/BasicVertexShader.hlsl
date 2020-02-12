@@ -90,7 +90,7 @@ float4 PrimitivePS(PrimitiveOutput input) : SV_TARGET{
 
 //頂点シェーダ(頂点情報から必要なものを次の人へ渡す)
 //パイプラインに投げるためにはSV_POSITIONが必要
-Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo:SV_InstanceID) {
+Output BasicVS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT,uint instNo:SV_InstanceID) {
 	//1280,720を直で使って構わない。
 	Output output;
 	float fWeight = float(weight) / 100.0f;
@@ -169,7 +169,7 @@ PixelOutput PS(Output input) {
 
 //影用頂点座標変換
 float4 
-shadowVS(float4 pos:POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min16uint2 boneno : BONENO, min16uint weight : WEIGHT) :SV_POSITION{
+ShadowVS(float4 pos:POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min16uint2 boneno : BONENO, min16uint weight : WEIGHT) :SV_POSITION{
 	float fWeight = float(weight) / 100.0f;
 	matrix conBone = bones[boneno.x] * fWeight +
 						bones[boneno.y] * (1.0f - fWeight);
