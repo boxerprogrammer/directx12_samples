@@ -81,13 +81,6 @@ float4 Get5x5GaussianBlur(Texture2D<float4> tex, SamplerState smp,float2 uv,floa
 	) / 256.0f, ret.a);
 }
 
-Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
-	Output output;
-	output.pos = pos;
-	output.uv = uv;
-	return output;
-}
-
 float4 PeraPS(Output input) : SV_TARGET{
 	if (input.uv.x<0.2&&input.uv.y < 0.2) {//[“xo—Í
 		float depth = depthTex.Sample(smp, input.uv*5);

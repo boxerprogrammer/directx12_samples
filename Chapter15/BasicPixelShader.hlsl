@@ -61,14 +61,6 @@ struct PrimitiveOutput {
 	float4 tpos : TPOS;
 	float4 normal:NORMAL;
 };
-
-PrimitiveOutput PrimitiveVS(float4 pos:POSITION, float4 normal : NORMAL) {
-	PrimitiveOutput output;
-	output.svpos = mul(proj, mul(view, pos));
-	output.tpos = mul(lightCamera, pos);
-	output.normal = normal;
-	return output;
-}
 float4 PrimitivePS(PrimitiveOutput input) : SV_TARGET{
 	float3 light = normalize(float3(1,-1,1));
 	float bright = dot(input.normal, -light);
@@ -146,16 +138,4 @@ PixelOutput BasicPS(Output input) {
 	output.highLum.a = 1.0f;
 	return output;
 }
-
-//âeópí∏ì_ç¿ïWïœä∑
-float4 
-shadowVS(float4 pos:POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min16uint2 boneno : BONENO, min16uint weight : WEIGHT) :SV_POSITION{
-	float fWeight = float(weight) / 100.0f;
-	matrix conBone = bones[boneno.x] * fWeight +
-						bones[boneno.y] * (1.0f - fWeight);
-
-	pos = mul(world, mul(conBone, pos));
-	return  mul(lightCamera, pos);
-}
-
 

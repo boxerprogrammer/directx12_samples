@@ -87,56 +87,7 @@ Output PeraVS(float4 pos:POSITION, float2 uv : TEXCOORD) {
 	output.uv = uv;
 	return output;
 }
-
-float4 PS(Output input) : SV_TARGET{
-	if (input.uv.x<0.2&&input.uv.y < 0.2) {//深度出力
-		float depth = depthTex.Sample(smp, input.uv*5);
-		depth = 1.0f - pow(depth, 30);
-		return float4(depth, depth, depth, 1);
-	}else if (input.uv.x < 0.2&&input.uv.y < 0.4) {//ライトからの深度出力
-		float depth = lightDepthTex.Sample(smp, (input.uv-float2(0,0.2)) * 5);
-		depth = 1 - depth;
-		return float4(depth, depth, depth, 1);
-	}else if (input.uv.x < 0.2&&input.uv.y < 0.6) {//法線出力
-		return texNormal.Sample(smp, (input.uv - float2(0, 0.4)) * 5);
-	}
-	else if (input.uv.x < 0.2&&input.uv.y < 0.8) {//AO
-		float s=texSSAO.Sample(smp, (input.uv - float2(0, 0.6)) * 5);
-		return float4(s,s,s,1);
-	}
-
-	float4 col=tex.Sample(smp, input.uv);
-	return float4(col.rgb*texSSAO.Sample(smp, input.uv),col.a);
-}
-
-float4 VerticalBlurPS(Output input) : SV_TARGET{
-	float w,h,miplevels;
-	tex.GetDimensions(0, w, h, miplevels);
-	float dx = 1.0 / w;
-	float dy = 1.0 / h;
-	float4 col = tex.Sample(smp,input.uv);
-	float3 ret = col.rgb * wgts[0];
-	for (int i = 1; i < 8; ++i) {
-		ret += wgts[i >> 2][i % 4] * tex.Sample(smp, input.uv + float2(0, dy*i));
-		ret += wgts[i >> 2][i % 4] * tex.Sample(smp, input.uv - float2(0, dy*i));
-	}
-	return float4(ret,col.a);
-}
-
 struct BlurOutput {
 	float4 highLum:SV_TARGET0;//高輝度(High Luminance)
 	float4 col:SV_TARGET1;//通常のレンダリング結果
 };
-
-//メインテクスチャを5x5ブラーでぼかすピクセルシェーダ
-BlurOutput BlurPS(Output input)
-{
-	float w,h,miplevels;
-	tex.GetDimensions(0, w, h, miplevels);
-	float dx = 1.0 / w;
-	float dy = 1.0 / h;
-	BlurOutput ret;
-	ret.col = tex.Sample(smp,input.uv);// Get5x5GaussianBlur(tex, smp, input.uv, dx, dy, float4(0, 0, 1, 1));
-	ret.highLum= Get5x5GaussianBlur(texHighLum, smp, input.uv, dx, dy, float4(0, 0, 1, 1));
-	return ret;
-}

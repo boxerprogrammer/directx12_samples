@@ -221,7 +221,7 @@ PMDRenderer::CreatePipeline() {
 	ID3DBlob* psBlob = nullptr;
 	result = D3DCompileFromFile(
 		L"BasicPixelShader.hlsl",
-		nullptr, nullptr,
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"BasicPS", "ps_5_0",
 		0, 0, &psBlob, &errBlob);
 	if (!CheckResult(result, errBlob)) {
@@ -300,7 +300,8 @@ PMDRenderer::CreatePipeline() {
 	}
 
 	result = D3DCompileFromFile(L"BasicVertexShader.hlsl", 
-		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "ShadowVS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, 
+		"ShadowVS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
 	if (!CheckResult(result, errBlob)) {
 		return false;
 	}
