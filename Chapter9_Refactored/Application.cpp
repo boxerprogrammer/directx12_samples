@@ -421,8 +421,8 @@ Application::CreateBasicGraphicsPipeline() {
 	ComPtr<ID3DBlob> _vsBlob = nullptr;
 	ComPtr<ID3DBlob> _psBlob = nullptr;
 	ComPtr<ID3DBlob> errorBlob = nullptr;
-	auto result = D3DCompileFromFile(L"BasicShader.hlsl",
-		nullptr, nullptr,
+	auto result = D3DCompileFromFile(L"BasicVertexShader.hlsl",
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"BasicVS", "vs_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &_vsBlob, &errorBlob);
@@ -439,8 +439,8 @@ Application::CreateBasicGraphicsPipeline() {
 		}
 		return result;
 	}
-	result = D3DCompileFromFile(L"BasicShader.hlsl",
-		nullptr, nullptr,
+	result = D3DCompileFromFile(L"BasicPixelShader.hlsl",
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0, &_psBlob, &errorBlob);
