@@ -1,8 +1,16 @@
+#include"Type.hlsli"
 SamplerState smp : register(s0);
 SamplerState clutSmp : register(s1);
 
+//シーン管理用スロット
+cbuffer SceneBuffer : register(b1) {
+	matrix view;//ビュー
+	matrix proj;//プロジェクション
+	float3 eye;//視点
+};
+
 //マテリアル用スロット
-cbuffer materialBuffer : register(b0) {
+cbuffer MaterialBuffer : register(b0) {
 	float4 diffuse;
 	float power;
 	float3 specular;
@@ -13,59 +21,10 @@ Texture2D<float4> sph : register(t1);//スフィアマップ(乗算)
 Texture2D<float4> spa : register(t2);//スフィアマップ(加算)
 Texture2D<float4> toon : register(t3);//トゥーンテクスチャ
 
-//シーン管理用スロット
-cbuffer sceneBuffer : register(b1) {
-	matrix view;//ビュー
-	matrix proj;//プロジェクション
-	float3 eye;//視点
-};
-
-//アクター座標変換用スロット
-cbuffer transBuffer : register(b2) {
-	matrix world;
-}
-
-//ボーン行列配列
-cbuffer transBuffer : register(b3) {
-	matrix bones[512];
-}
-
-
-//返すのはSV_POSITIONだけではない
-struct Output {
-	float4 svpos : SV_POSITION;
-	float4 pos : POSITION;
-	float4 normal : NORMAL;
-	float2 uv : TEXCOORD;
-	float weight : WEIGHT;
-	float boneno : BONENO;
-};
-
-//頂点シェーダ(頂点情報から必要なものを次の人へ渡す)
-//パイプラインに投げるためにはSV_POSITIONが必要
-Output VS(float4 pos:POSITION,float4 normal:NORMAL,float2 uv:TEXCOORD,min16uint2 boneno:BONENO,min16uint weight:WEIGHT) {
-	//1280,720を直で使って構わない。
-	Output output;
-	float fWeight = float(weight) / 100.0f;
-	matrix conBone = bones[boneno.x]*fWeight + 
-						bones[boneno.y]*(1.0f - fWeight);
-
-	output.pos = mul(world, 
-						mul(conBone,pos)
-					);
-	output.svpos = mul(proj,mul(view, output.pos));
-	output.uv = uv;
-	normal.w = 0;
-	output.normal = mul(world,normal);
-	output.weight = (float)weight/100.0f;
-	output.boneno = boneno[0]/122.0;
-	//output.uv = uv;
-	return output;
-}
 
 
 //ピクセルシェーダ
-float4 PS(Output input):SV_TARGET {
+float4 BasicPS(BasicType input):SV_TARGET {
 	float3 eyeray = normalize(input.pos-eye);
 	float3 light = normalize(float3(1,-1,1));
 	float3 rlight = reflect(light, input.normal);

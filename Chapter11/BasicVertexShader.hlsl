@@ -1,3 +1,4 @@
+#include"BasicType.hlsli"
 Texture2D<float4> tex:register(t0);//0番スロットに設定されたテクスチャ(ベース)
 Texture2D<float4> sph:register(t1);//1番スロットに設定されたテクスチャ(乗算)
 Texture2D<float4> spa:register(t2);//2番スロットに設定されたテクスチャ(加算)

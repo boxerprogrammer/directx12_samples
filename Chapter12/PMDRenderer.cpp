@@ -174,10 +174,10 @@ PMDRenderer::CreatePipeline() {
 	ID3DBlob* vsBlob = nullptr;
 	ID3DBlob* errBlob = nullptr;
 	auto result = D3DCompileFromFile(
-		L"BasicShader.hlsl",//シェーダファイルパス
+		L"BasicVertexShader.hlsl",//シェーダファイルパス
 		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
-		nullptr,//インクルード定義(ID3DIncludeのポインタ)
-		"VS",//エントリポイント関数名
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"BasicVS",//エントリポイント関数名
 		"vs_5_0",//シェーダのバージョン
 		0,//フラグ(あまり意味ない)
 		0,//フラグ(あまり意味ない)
@@ -189,9 +189,9 @@ PMDRenderer::CreatePipeline() {
 
 	ID3DBlob* psBlob = nullptr;
 	result = D3DCompileFromFile(
-		L"BasicShader.hlsl",
-		nullptr, nullptr,
-		"PS", "ps_5_0",
+		L"BasicPixelShader.hlsl",
+		nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"BasicPS", "ps_5_0",
 		0, 0, &psBlob, &errBlob);
 	if (!CheckResult(result, errBlob)) {
 		return false;

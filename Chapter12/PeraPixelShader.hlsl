@@ -1,4 +1,4 @@
-
+#include"Type.hlsli"
 cbuffer Weight : register(b0) {
 	float4 bkweights[2];
 };
@@ -7,19 +7,8 @@ Texture2D<float4> distTex : register(t1);
 
 SamplerState smp : register(s0);
 
-struct Output {
-	float4 pos: SV_POSITION;
-	float2 uv:TEXCOORD;
-};
 
-Output VS(float4 pos:POSITION, float2 uv : TEXCOORD) {
-	Output output;
-	output.pos = pos;
-	output.uv = uv;
-	return output;
-}
-
-float4 VerticalBokehPS(Output input) : SV_TARGET{
+float4 VerticalBokehPS(PeraType input) : SV_TARGET{
 	float w, h, level;
 	tex.GetDimensions(0, w, h, level);
 	float dx = 1.0f / w;
@@ -40,7 +29,7 @@ float4 VerticalBokehPS(Output input) : SV_TARGET{
 	return float4(ret.rgb, col.a);
 }
 
-float4 PS(Output input) : SV_TARGET{
+float4 PeraPS(PeraType input) : SV_TARGET{
 	
 	//float Y = dot(col.rgb, float3(0.299, 0.587, 0.114));
 	//return float4(Y, Y, Y, 1);
