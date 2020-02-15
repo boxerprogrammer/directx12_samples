@@ -497,6 +497,9 @@ int main() {
 #include<Windows.h>
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #endif
+	//以下を書いておかないとCOMが旨く動かずWICが正常に動作しないことがあります。
+	//(書かなくても動くときもあります)
+	auto result = CoInitializeEx(0, COINIT_MULTITHREADED);
 	DebugOutputFormatString("Show window test.");
 	HWND hwnd;
 	WNDCLASSEX windowClass = {};
@@ -507,7 +510,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//デバッグレイヤーをオンに
 	EnableDebugLayer();
 #endif
-	HRESULT result = InitializeDXGIDevice();
+	result = InitializeDXGIDevice();
 
 	result = InitializeCommand();
 
