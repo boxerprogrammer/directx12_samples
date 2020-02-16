@@ -9,12 +9,12 @@ struct BasicType {
 };
 
 
+
 struct PrimitiveType {
 	float4 svpos:SV_POSITION;
 	float4 tpos : TPOS;
 	float4 normal:NORMAL;
 };
-
 
 struct PixelOutput {
 	float4 col:SV_TARGET0;//’Êí‚ÌƒŒƒ“ƒ_ƒŠƒ“ƒOŒ‹‰Ê
