@@ -106,3 +106,9 @@ PixelOutput BasicPS(BasicType input) {
 	output.highLum.a = 1.0f;
 	return output;
 }
+
+
+float4
+ShadowPS(float4 pos:SV_POSITION) :SV_TARGET{
+	return float4(1,1,1,1);
+}

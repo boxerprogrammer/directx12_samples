@@ -1,3 +1,4 @@
+#include"Type.hlsli"
 Texture2D<float4> tex : register(t0);//通常カラー
 Texture2D<float4> texNorm : register(t1);//法線
 Texture2D<float4> texHighLum : register(t2);//高輝度
@@ -39,18 +40,13 @@ float4 GaussianFilteredColor5x5(Texture2D<float4> tex, SamplerState s, float2 uv
 }
 SamplerState smp : register(s0);
 
-struct Input {
-	float4 pos:SV_POSITION;
-	float2 uv:TEXCOORD;
-};
-
-struct Output {
+struct ShrinkOutput {
 	float4 highLum:SV_TARGET0;
 	float4 colForDof:SV_TARGET1;
 };
 
-Output ShrinkPS(Input input) {
-	Output o;
+ShrinkOutput ShrinkPS(PeraType input) {
+	ShrinkOutput o;
 	float w, h, miplevel;
 	tex.GetDimensions(0,w, h, miplevel);
 	float dx = 1.0f / w;
