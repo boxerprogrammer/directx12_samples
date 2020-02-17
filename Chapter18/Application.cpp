@@ -120,7 +120,7 @@ Application::Initialize() {
 	_heapForSpriteFont = _dx12->CreateDescriptorHeapForSpriteFont();
 	spriteFont = new DirectX::SpriteFont(_dx12->Device(),
 		resUploadBatch,
-		L"font/hgpop.spritefont",
+		L"font/fonttest.spritefont",
 		_heapForSpriteFont->GetCPUDescriptorHandleForHeapStart(),
 		_heapForSpriteFont->GetGPUDescriptorHandleForHeapStart());
 	auto future = resUploadBatch.End(_dx12->CmdQue());
@@ -149,10 +149,10 @@ Application::Initialize() {
 		1, //レンダーターゲット数
 		false, //デプスありか？
 		false, //反対デプスありか？
-		10000);//最大パーティクルの数
+		2000);//最大パーティクルの数
 
 
-	_efkManager = Effekseer::Manager::Create(10000);//最大インスタンス数
+	_efkManager = Effekseer::Manager::Create(2000);//最大インスタンス数
 
 
 	//「系」を左手系にしておく(とにかくクライアント側の系に合わせる)
@@ -185,32 +185,27 @@ Application::Initialize() {
 
 	// エフェクトの再生
 	_efkHandle = _efkManager->Play(_effect, 0, 0, 0);
-
-	
-
-
-
 	_actor.reset(new PMDActor(_dx12, "Model/初音ミク.pmd"));
 	_actor->Move(-10, 0, 10);
 	
 	_pmdRenderer->AddActor(_actor);
 	_pmdRenderer->AddActor("Model/初音ミクmetal.pmd");
 
-	auto satori = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
-	satori->Move(-5, 0, 5);
-	_pmdRenderer->AddActor(satori);
+	auto rin = make_shared<PMDActor>(_dx12, "Model/鏡音リン.pmd");
+	rin->Move(-5, 0, 5);
+	_pmdRenderer->AddActor(rin);
 
 	auto ruka = make_shared<PMDActor>(_dx12, "Model/巡音ルカ.pmd");
 	ruka->Move(10, 0, 10);
 	_pmdRenderer->AddActor(ruka);
 
-	auto hibiki = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
-	hibiki->Move(-10, 0, 0);
-	_pmdRenderer->AddActor(hibiki);
+	auto haku = make_shared<PMDActor>(_dx12, "Model/弱音ハク.pmd");
+	haku->Move(-10, 0, 0);
+	_pmdRenderer->AddActor(haku);
 	
-	auto katu = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
-	katu->Move(10, 0, 0);
-	_pmdRenderer->AddActor(katu);
+	auto kaito = make_shared<PMDActor>(_dx12, "Model/カイト.pmd");
+	kaito->Move(10, 0, 0);
+	_pmdRenderer->AddActor(kaito);
 
 
 	_pmdRenderer->AnimationStart();

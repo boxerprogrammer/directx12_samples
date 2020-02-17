@@ -1137,12 +1137,18 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraVertexShader.hlsl", 
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"PeraVS", "vs_5_0", 0, 0, vs.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result,errBlob.Get())) {
 		assert(0);
 		return false;
 	}
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", 
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"PeraPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -1177,7 +1183,10 @@ Dx12Wrapper::CreatePeraPipeline() {
 		return false;
 	}
 
-	result = D3DCompileFromFile(L"ShrinkShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "ShrinkPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"ShrinkPixelShader.hlsl", 
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"ShrinkPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -1194,7 +1203,10 @@ Dx12Wrapper::CreatePeraPipeline() {
 
 	
 
-	result = D3DCompileFromFile(L"pera.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VerticalBlurPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"PeraPixelShader.hlsl", 
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"VerticalBlurPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -1206,7 +1218,10 @@ Dx12Wrapper::CreatePeraPipeline() {
 		return false;
 	}
 
-	result = D3DCompileFromFile(L"ssao.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "SsaoPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	result = D3DCompileFromFile(L"SSAOPixelShader.hlsl", 
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
+		"SsaoPS", "ps_5_0", 0, 0, ps.ReleaseAndGetAddressOf(), errBlob.ReleaseAndGetAddressOf());
 	if (!CheckResult(result, errBlob.Get())) {
 		assert(0);
 		return false;
@@ -1612,9 +1627,9 @@ Dx12Wrapper::CreatePrimitivePipeline() {
 	ID3DBlob* vsBlob = nullptr;
 	ID3DBlob* errBlob = nullptr;
 	auto result = D3DCompileFromFile(
-		L"BasicShader.hlsl",//シェーダファイルパス
+		L"BasicVertexShader.hlsl",//シェーダファイルパス
 		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
-		nullptr,//インクルード定義(ID3DIncludeのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
 		"PrimitiveVS",//エントリポイント関数名
 		"vs_5_0",//シェーダのバージョン
 		0,//フラグ(あまり意味ない)
@@ -1627,8 +1642,9 @@ Dx12Wrapper::CreatePrimitivePipeline() {
 
 	ID3DBlob* psBlob = nullptr;
 	result = D3DCompileFromFile(
-		L"BasicShader.hlsl",
-		nullptr, nullptr,
+		L"BasicPixelShader.hlsl",
+		nullptr,//マクロ定義(D3D_SHADER_MACROのポインタ)
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード定義(ID3DIncludeのポインタ)
 		"PrimitivePS", "ps_5_0",
 		0, 0, &psBlob, &errBlob);
 	if (!CheckResult(result, errBlob)) {
@@ -1874,7 +1890,7 @@ Dx12Wrapper::CreateGradationTexture() {
 
 bool 
 Dx12Wrapper::CreateDistortion() {
-	if (!LoadPictureFromFile(L"normal/Cracked_N.jpg", _distBuff)) {
+	if (!LoadPictureFromFile(L"normal/crack_n.png", _distBuff)) {
 		return false;
 	}
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
