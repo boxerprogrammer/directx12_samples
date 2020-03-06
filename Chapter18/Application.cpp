@@ -120,7 +120,7 @@ Application::Initialize() {
 	_heapForSpriteFont = _dx12->CreateDescriptorHeapForSpriteFont();
 	spriteFont = new DirectX::SpriteFont(_dx12->Device(),
 		resUploadBatch,
-		L"font/fonttest.spritefont",
+		L"font/hgpop.spritefont",
 		_heapForSpriteFont->GetCPUDescriptorHandleForHeapStart(),
 		_heapForSpriteFont->GetGPUDescriptorHandleForHeapStart());
 	auto future = resUploadBatch.End(_dx12->CmdQue());
@@ -405,8 +405,7 @@ Application::Run() {
 			_dx12->SetFocusPos(pnt.x, pnt.y);
 		}
 
-		_dx12->CmdList()->SetDescriptorHeaps(1, _heapImgui.GetAddressOf());
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _dx12->CmdList());
+
 
 		_dx12->CmdList()->SetDescriptorHeaps(1, _heapForSpriteFont.GetAddressOf());
 		_spriteBatch->Begin(_dx12->CmdList());
@@ -414,6 +413,8 @@ Application::Run() {
 		spriteFont->DrawString(_spriteBatch, L"DirectX12‚Ì–‚“±‘", DirectX::XMFLOAT2(100, 100), DirectX::Colors::Yellow);
 		_spriteBatch->End();
 
+		_dx12->CmdList()->SetDescriptorHeaps(1, _heapImgui.GetAddressOf());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _dx12->CmdList());
 
 		_dx12->Flip();
 	}
