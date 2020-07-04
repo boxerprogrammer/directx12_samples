@@ -138,7 +138,6 @@ CreateGrayGradationTexture() {
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
 	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
 
-
 	D3D12_HEAP_PROPERTIES texHeapProp = {};
 	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;//特殊な設定なのでdefaultでもuploadでもなく
 	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//ライトバックで
@@ -164,7 +163,8 @@ CreateGrayGradationTexture() {
 	auto it = data.begin();
 	unsigned int c=0xff;
 	for (; it != data.end();it+=4) {
-		auto col = (c << 0xff) | (c << 16) | (c << 8) | c;
+		auto col = (0xff << 24) | RGB(c,c,c);//RGBAが逆並びしているためRGBマクロと0xff<<24を用いて表す。
+		//auto col = (0xff << 24) | (c<<16)|(c<<8)|c;//これでもOK
 		std::fill(it, it+4, col);
 		--c;
 	}
@@ -605,8 +605,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//string strModelPath = "Model/hibiki/hibiki.pmd";
 	//string strModelPath = "Model/satori/satori.pmd";
 	//string strModelPath = "Model/reimu/reimu.pmd";
-	//string strModelPath = "Model/巡音ルカ.pmd";
-	string strModelPath = "Model/初音ミク.pmd";
+	string strModelPath = "Model/巡音ルカ.pmd";
+	//string strModelPath = "Model/初音ミク.pmd";
 	
 	auto fp = fopen(strModelPath.c_str(), "rb");
 	fread(signature, sizeof(signature), 1, fp);
