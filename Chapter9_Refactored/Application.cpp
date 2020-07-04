@@ -136,7 +136,7 @@ Application::CreateGrayGradationTexture() {
 	auto it = data.begin();
 	unsigned int c = 0xff;
 	for (; it != data.end(); it += 4) {
-		auto col = (c << 0xff) | (c << 16) | (c << 8) | c;
+		auto col = (0xff << 24) | RGB(c, c, c);//RGBAが逆並びしているためRGBマクロと0xff<<24を用いて表す。
 		std::fill(it, it + 4, col);
 		--c;
 	}
