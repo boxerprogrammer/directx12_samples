@@ -186,9 +186,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	
 
-	for (int i = 0; i < swcDesc.BufferCount; ++i) {
-		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
-		//rtvDesc.Format=_backBuffers[i]->GetDesc().Format;
+	for (size_t i = 0; i < swcDesc.BufferCount; ++i) {
+		result = _swapchain->GetBuffer(static_cast<UINT>(i), IID_PPV_ARGS(&_backBuffers[i]));
 		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, handle);
 		handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
@@ -457,12 +456,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Format = metadata.format;//DXGI_FORMAT_R8G8B8A8_UNORM;//RGBAフォーマット
-	resDesc.Width = metadata.width;//幅
-	resDesc.Height = metadata.height;//高さ
-	resDesc.DepthOrArraySize = metadata.arraySize;//2Dで配列でもないので１
+	resDesc.Width = static_cast<UINT>(metadata.width);//幅
+	resDesc.Height = static_cast<UINT>(metadata.height);//高さ
+	resDesc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);//2Dで配列でもないので１
 	resDesc.SampleDesc.Count = 1;//通常テクスチャなのでアンチェリしない
 	resDesc.SampleDesc.Quality = 0;//
-	resDesc.MipLevels = metadata.mipLevels;//ミップマップしないのでミップ数は１つ
+	resDesc.MipLevels = static_cast<UINT16>(metadata.mipLevels);//ミップマップしないのでミップ数は１つ
 	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);//2Dテクスチャ用
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;//レイアウトについては決定しない
 	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;//とくにフラグなし
@@ -480,8 +479,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	result = texbuff->WriteToSubresource(0,
 		nullptr,//全領域へコピー
 		img->pixels,//元データアドレス
-		img->rowPitch,//1ラインサイズ
-		img->slicePitch//全サイズ
+		static_cast<UINT>(img->rowPitch),//1ラインサイズ
+		static_cast<UINT>(img->slicePitch)//全サイズ
 	);
 
 	//定数バッファ作成
@@ -535,7 +534,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		_dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+	cbvDesc.SizeInBytes = static_cast<UINT>(constBuff->GetDesc().Width);
 	//定数バッファビューの作成
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
