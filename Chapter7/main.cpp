@@ -184,8 +184,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	
 
-	for (int i = 0; i < swcDesc.BufferCount; ++i) {
-		result = _swapchain->GetBuffer(i, IID_PPV_ARGS(&_backBuffers[i]));
+	for (size_t i = 0; i < swcDesc.BufferCount; ++i) {
+		result = _swapchain->GetBuffer(static_cast<UINT>(i), IID_PPV_ARGS(&_backBuffers[i]));
 		rtvDesc.Format = _backBuffers[i]->GetDesc().Format;
 		_dev->CreateRenderTargetView(_backBuffers[i], &rtvDesc, rtvH);
 		rtvH.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -255,7 +255,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 	char signature[3];
 	PMDHeader pmdheader = {};
-	auto fp = fopen("Model/初音ミク.pmd", "rb");
+	FILE* fp;
+	auto err= fopen_s(&fp,"Model/初音ミク.pmd", "rb");
+	if (fp == nullptr) {
+		char strerr[256];
+		strerror_s(strerr, 256, err);
+		MessageBox(hwnd, strerr,"Open Error",MB_ICONERROR);
+		return -1;
+	}
 	fread(signature, sizeof(signature), 1, fp);
 	fread(&pmdheader, sizeof(pmdheader), 1, fp);
 
@@ -285,7 +292,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();//バッファの仮想アドレス
-	vbView.SizeInBytes = vertices.size();//全バイト数
+	vbView.SizeInBytes = static_cast<UINT>(vertices.size());//全バイト数
 	vbView.StrideInBytes = pmdvertex_size;//1頂点あたりのバイト数
 	
 	std::vector<unsigned short> indices(indicesNum);
@@ -314,7 +321,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_INDEX_BUFFER_VIEW ibView = {};
 	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
 	ibView.Format = DXGI_FORMAT_R16_UINT;
-	ibView.SizeInBytes = indices.size()*sizeof(indices[0]);
+	ibView.SizeInBytes = static_cast<UINT>(indices.size()*sizeof(indices[0]));
 
 
 
@@ -557,7 +564,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	auto basicHeapHandle=basicDescHeap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+	cbvDesc.SizeInBytes = static_cast<UINT>(constBuff->GetDesc().Width);
 	//定数バッファビューの作成
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
