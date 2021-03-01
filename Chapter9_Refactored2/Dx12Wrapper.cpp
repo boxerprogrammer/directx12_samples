@@ -221,7 +221,7 @@ Dx12Wrapper::GetTextureByPath(const char* texpath) {
 void 
 Dx12Wrapper::CreateTextureLoaderTable() {
 	_loadLambdaTable["sph"] = _loadLambdaTable["spa"] = _loadLambdaTable["bmp"] = _loadLambdaTable["png"] = _loadLambdaTable["jpg"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
-		return LoadFromWICFile(path.c_str(), 0, meta, img);
+		return LoadFromWICFile(path.c_str(), WIC_FLAGS_NONE, meta, img);
 	};
 
 	_loadLambdaTable["tga"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
@@ -229,7 +229,7 @@ Dx12Wrapper::CreateTextureLoaderTable() {
 	};
 
 	_loadLambdaTable["dds"] = [](const wstring& path, TexMetadata* meta, ScratchImage& img)->HRESULT {
-		return LoadFromDDSFile(path.c_str(), 0, meta, img);
+		return LoadFromDDSFile(path.c_str(),DDS_FLAGS_NONE, meta, img);
 	};
 }
 //テクスチャ名からテクスチャバッファ作成、中身をコピー

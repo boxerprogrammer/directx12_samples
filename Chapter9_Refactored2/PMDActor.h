@@ -3,6 +3,7 @@
 #include<d3d12.h>
 #include<DirectXMath.h>
 #include<vector>
+#include<string>
 #include<wrl.h>
 
 class Dx12Wrapper;
