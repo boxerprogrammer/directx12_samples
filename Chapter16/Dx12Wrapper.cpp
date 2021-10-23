@@ -376,10 +376,12 @@ Dx12Wrapper::CreatePeraVertex() {
 						{{1,-1,0.1},{1,1}},
 						{{1,1,0.1},{1,0}} };
 
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv));
 	auto result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_peraVB.ReleaseAndGetAddressOf()));
@@ -518,7 +520,8 @@ Dx12Wrapper::PreDrawToPera1() {
 		handle.InitOffsetted(baseH, offset);
 		offset += incSize;
 	}
-	_cmdList->OMSetRenderTargets(_countof(handles),handles, false, &_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHeapPointer = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	_cmdList->OMSetRenderTargets(_countof(handles),handles, false, &dsvHeapPointer);
 	//クリアカラー		 R   G   B   A
 	float clsClr[4] = { 0.5,0.5,0.5,1.0 };
 	for (int i = 0; i < _countof(handles);++i) {
@@ -570,7 +573,8 @@ Dx12Wrapper::Clear() {
 void Dx12Wrapper::Barrier(ID3D12Resource* p,
 	D3D12_RESOURCE_STATES before,
 	D3D12_RESOURCE_STATES after){
-	_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0));
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0);
+	_cmdList->ResourceBarrier(1, &barrier);
 }
 
 void 
@@ -1118,10 +1122,12 @@ bool
 Dx12Wrapper::CreatePostSetting() {
 	auto bufferSize = AligmentedValue(sizeof(PostSetting), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	//まずはバッファ作る
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
 	auto result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_postSettingResource.ReleaseAndGetAddressOf()));
@@ -1205,11 +1211,14 @@ Dx12Wrapper::CreatePrimitives() {
 	};
 	uint16_t indexes[]={ 0,1,2,1,3,2 };
 
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(plane));
 	//頂点バッファ作成
 	ID3D12Resource* vbuff=nullptr;
-	auto result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	auto result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(plane)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vbuff));
@@ -1230,11 +1239,14 @@ Dx12Wrapper::CreatePrimitives() {
 	copy(begin(plane), end(plane), mappedVertex);
 	vbuff->Unmap(0, nullptr);
 
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(indexes));
 	//インデックスバッファ作成
 	ID3D12Resource* ibuff = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(indexes)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&ibuff));
@@ -1327,11 +1339,14 @@ Dx12Wrapper::CreatePrimitives() {
 		++idx;
 	}
 
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(cone));
 	//頂点バッファ作成
 	ID3D12Resource* coneVBuff = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(cone)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&coneVBuff));
@@ -1346,12 +1361,14 @@ Dx12Wrapper::CreatePrimitives() {
 	_primitivesVBV.push_back(vbv);
 
 	
-
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(coneIdxes));
 	//インデックスバッファ作成
 	ID3D12Resource* coneIB = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(coneIdxes)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&coneIB));
@@ -1866,14 +1883,15 @@ Dx12Wrapper::LoadPictureFromFile(wstring filepath, ComPtr<ID3D12Resource>& buff)
 			scratchImg);
 	}
 	else if (ext == L"dds") {
-		result = LoadFromDDSFile(filepath.c_str(),0,
+		result = LoadFromDDSFile(filepath.c_str(),
+			DDS_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 		isDXT = true;
 	}
 	else {
 		result = LoadFromWICFile(filepath.c_str(),
-			0,
+			WIC_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 	}

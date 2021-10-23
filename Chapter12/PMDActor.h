@@ -8,6 +8,8 @@
 #include<wrl.h>
 #include<map>
 #include<unordered_map>
+#include<memory>
+#include<algorithm>
 
 using Microsoft::WRL::ComPtr;
 class Dx12Wrapper;

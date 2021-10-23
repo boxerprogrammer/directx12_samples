@@ -5,6 +5,7 @@
 #include<dxgi1_6.h>
 #include<DirectXMath.h>
 #include<vector>
+#include<string>
 
 #include<d3dcompiler.h>
 #ifdef _DEBUG

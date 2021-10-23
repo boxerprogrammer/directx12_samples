@@ -4,6 +4,7 @@
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<vector>
+#include<string>
 #ifdef _DEBUG
 #include<iostream>
 #endif
