@@ -180,10 +180,12 @@ Dx12Wrapper::CreatePeraVertex() {
 						{{-1,1,0.1},{0,0}},
 						{{1,-1,0.1},{1,1}},
 						{{1,1,0.1},{1,0}} };
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv));
 	auto result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_peraVB.ReleaseAndGetAddressOf()));
@@ -279,17 +281,18 @@ Dx12Wrapper::CreateCommandList() {
 
 void 
 Dx12Wrapper::PostDrawToPera1() {
-	_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(_peraResource.Get(),
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_peraResource.Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	_cmdList->ResourceBarrier(1, &barrier);
 }
 
 bool 
 Dx12Wrapper::PreDrawToPera1() {
-	_cmdList->ResourceBarrier(1, 
-		&CD3DX12_RESOURCE_BARRIER::Transition(_peraResource.Get(),
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_peraResource.Get(),
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET));
+		D3D12_RESOURCE_STATE_RENDER_TARGET);
+	_cmdList->ResourceBarrier(1, &barrier);
 	auto rtvHeapPointer = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
 	auto dsvHeapPointer = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
 	_cmdList->OMSetRenderTargets(1, &rtvHeapPointer, false, &dsvHeapPointer);
@@ -329,7 +332,8 @@ Dx12Wrapper::Clear() {
 void Dx12Wrapper::Barrier(ID3D12Resource* p,
 	D3D12_RESOURCE_STATES before,
 	D3D12_RESOURCE_STATES after){
-	_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0));
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0);
+	_cmdList->ResourceBarrier(1, &barrier);
 }
 
 void 
@@ -848,10 +852,12 @@ Dx12Wrapper::GetCameraPosition() {
 bool
 Dx12Wrapper::CreateBokehParamResource() {
 	auto weights=GetGaussianWeights(8, 5.0f);
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(AligmentedValue(sizeof(weights[0]) * weights.size(), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 	auto result=_dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(AligmentedValue(sizeof(weights[0])*weights.size(),D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_bokehParamResource.ReleaseAndGetAddressOf())
@@ -927,14 +933,14 @@ Dx12Wrapper::LoadPictureFromFile(wstring filepath, ComPtr<ID3D12Resource>& buff)
 			scratchImg);
 	}
 	else if (ext == L"dds") {
-		result = LoadFromDDSFile(filepath.c_str(),0,
+		result = LoadFromDDSFile(filepath.c_str(), DDS_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 		isDXT = true;
 	}
 	else {
 		result = LoadFromWICFile(filepath.c_str(),
-			0,
+			WIC_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 	}

@@ -51,7 +51,7 @@ namespace {
 	///@param lookat 向かせたい方向ベクトル
 	///@param up 上ベクトル
 	///@param right 右ベクトル
-	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+	XMMATRIX LookAtMatrix(const XMVECTOR& lookat, const XMFLOAT3& up, const XMFLOAT3& right) {
 		//向かせたい方向(z軸)
 		XMVECTOR vz = lookat;
 
@@ -85,7 +85,7 @@ namespace {
 	///@param up 上ベクトル
 	///@param right 右ベクトル
 	///@retval 特定のベクトルを特定の方向に向けるための行列
-	XMMATRIX LookAtMatrix(const XMVECTOR& origin, const XMVECTOR& lookat, XMFLOAT3& up, XMFLOAT3& right) {
+	XMMATRIX LookAtMatrix(const XMVECTOR& origin, const XMVECTOR& lookat, const XMFLOAT3& up, const XMFLOAT3& right) {
 		return XMMatrixTranspose(LookAtMatrix(origin, up, right))*
 			LookAtMatrix(lookat, up, right);
 	}
@@ -105,7 +105,8 @@ namespace {
 
 void
 PMDActor::LookAt(float x, float y, float z) {
-	_localMat = LookAtMatrix(XMLoadFloat3(&XMFLOAT3(x, y, z)), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
+	auto source = XMFLOAT3(x, y, z);
+	_localMat = LookAtMatrix(XMLoadFloat3(&source), XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0));
 }
 
 
@@ -639,12 +640,14 @@ PMDActor::LoadPMDFile(const char* path) {
 
 	unsigned int indicesNum;//インデックス数
 	fread(&indicesNum, sizeof(indicesNum), 1, fp);//
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(vertices.size());
 
 	//UPLOAD(確保は可能)
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_vb.ReleaseAndGetAddressOf()));
@@ -662,13 +665,14 @@ PMDActor::LoadPMDFile(const char* path) {
 	std::vector<unsigned short> indices(indicesNum);
 	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);//一気に読み込み
 
-
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0]));
 	//設定は、バッファのサイズ以外頂点バッファの設定を使いまわして
 	//OKだと思います。
 	result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_ib.ReleaseAndGetAddressOf()));
@@ -872,10 +876,12 @@ PMDActor::CreateTransformView() {
 	auto buffSize = sizeof(XMMATRIX)*(1 + _boneMatrices.size());
 	buffSize = (buffSize + 0xff)&~0xff;
 
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(buffSize);
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffSize),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf())
@@ -920,10 +926,12 @@ PMDActor::CreateMaterialData() {
 	//マテリアルバッファを作成
 	auto materialBuffSize = sizeof(MaterialForHlsl);
 	materialBuffSize = (materialBuffSize + 0xff)&~0xff;
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize * _materials.size());//勿体ないけど仕方ないですね
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize*_materials.size()),//勿体ないけど仕方ないですね
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_materialBuff.ReleaseAndGetAddressOf())

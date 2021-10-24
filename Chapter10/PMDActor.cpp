@@ -3,6 +3,7 @@
 #include"Dx12Wrapper.h"
 #include<d3dx12.h>
 #include<sstream>
+#include <algorithm>
 using namespace Microsoft::WRL;
 using namespace std;
 using namespace DirectX;
@@ -76,7 +77,7 @@ PMDActor::Transform::operator new(size_t size) {
 }
 
 void
-PMDActor::RecursiveMatrixMultipy(BoneNode* node, DirectX::XMMATRIX& mat) {
+PMDActor::RecursiveMatrixMultipy(BoneNode* node, const DirectX::XMMATRIX& mat) {
 	_boneMatrices[node->boneIdx] = mat;
 	for (auto& cnode : node->children) {
 		RecursiveMatrixMultipy(cnode, _boneMatrices[cnode->boneIdx] * mat);
@@ -132,9 +133,13 @@ PMDActor::LoadVMDFile(const char* filepath, const char* name) {
 
 	//VMDのキーフレームデータから、実際に使用するキーフレームテーブルへ変換
 	for (auto& f : keyframes) {
-		_motiondata[f.boneName].emplace_back(KeyFrame(f.frameNo, XMLoadFloat4(&f.quaternion),
-			XMFLOAT2((float)f.bezier[3]/127.0f,(float)f.bezier[7]/127.0f),
-			XMFLOAT2((float)f.bezier[11] / 127.0f, (float)f.bezier[15] / 127.0f)));
+		_motiondata[f.boneName].emplace_back(
+			KeyFrame(
+				f.frameNo, 
+				XMLoadFloat4(&f.quaternion),
+				XMFLOAT2((float)f.bezier[3]/127.0f,(float)f.bezier[7]/127.0f),
+				XMFLOAT2((float)f.bezier[11] / 127.0f, (float)f.bezier[15] / 127.0f)
+			));
 	}
 
 	for (auto& motion : _motiondata) {
@@ -197,8 +202,8 @@ PMDActor::MotionUpdate() {
 		}
 
 		auto& pos = node.startPos;
-		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)*//原点に戻し
-			rotation*//回転
+		auto mat = XMMatrixTranslation(-pos.x, -pos.y, -pos.z)* //原点に戻し
+			rotation* //回転
 			XMMatrixTranslation(pos.x, pos.y, pos.z);//元の座標に戻す
 		_boneMatrices[node.boneIdx] = mat;
 	}
@@ -255,11 +260,13 @@ PMDActor::LoadPMDFile(const char* path) {
 	unsigned int indicesNum;//インデックス数
 	fread(&indicesNum, sizeof(indicesNum), 1, fp);//
 
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(vertices.size());
 	//UPLOAD(確保は可能)
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_vb.ReleaseAndGetAddressOf()));
@@ -277,13 +284,14 @@ PMDActor::LoadPMDFile(const char* path) {
 	std::vector<unsigned short> indices(indicesNum);
 	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);//一気に読み込み
 
-
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0]));
 	//設定は、バッファのサイズ以外頂点バッファの設定を使いまわして
 	//OKだと思います。
 	result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_ib.ReleaseAndGetAddressOf()));
@@ -430,11 +438,13 @@ PMDActor::CreateTransformView() {
 	//GPUバッファ作成
 	auto buffSize = sizeof(XMMATRIX)*(1 + _boneMatrices.size());
 	buffSize = (buffSize + 0xff)&~0xff;
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(buffSize);
 
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(buffSize),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf())
@@ -479,10 +489,12 @@ PMDActor::CreateMaterialData() {
 	//マテリアルバッファを作成
 	auto materialBuffSize = sizeof(MaterialForHlsl);
 	materialBuffSize = (materialBuffSize + 0xff)&~0xff;
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize * _materials.size());//勿体ないけど仕方ないですね
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(materialBuffSize*_materials.size()),//勿体ないけど仕方ないですね
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_materialBuff.ReleaseAndGetAddressOf())

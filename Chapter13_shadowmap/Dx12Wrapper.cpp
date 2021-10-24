@@ -291,10 +291,12 @@ Dx12Wrapper::CreatePeraVertex() {
 						{{1,-1,0.1},{1,1}},
 						{{1,1,0.1},{1,0}} };
 
+	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv));
 	auto result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(pv)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_peraVB.ReleaseAndGetAddressOf()));
@@ -422,7 +424,11 @@ Dx12Wrapper::PreDrawToPera1() {
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	auto rtvHeapPointer = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
-	_cmdList->OMSetRenderTargets(1, &rtvHeapPointer, false, &_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	auto dsvHeapPointer = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	_cmdList->OMSetRenderTargets(1, 
+		&rtvHeapPointer, 
+		false, 
+		&dsvHeapPointer);
 	//クリアカラー		 R   G   B   A
 	float clsClr[4] = { 0.5,0.5,0.5,1.0 };
 	_cmdList->ClearRenderTargetView(rtvHeapPointer, clsClr, 0, nullptr);
@@ -468,7 +474,8 @@ Dx12Wrapper::Clear() {
 void Dx12Wrapper::Barrier(ID3D12Resource* p,
 	D3D12_RESOURCE_STATES before,
 	D3D12_RESOURCE_STATES after){
-	_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0));
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p, before, after, 0);
+	_cmdList->ResourceBarrier(1, &barrier);
 }
 
 void 
@@ -871,10 +878,13 @@ Dx12Wrapper::CreatePrimitives() {
 	uint16_t indexes[]={ 0,1,2,1,3,2 };
 
 	//頂点バッファ作成
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(plane));
 	ID3D12Resource* vbuff=nullptr;
-	auto result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	auto result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(plane)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&vbuff));
@@ -896,10 +906,13 @@ Dx12Wrapper::CreatePrimitives() {
 	vbuff->Unmap(0, nullptr);
 
 	//インデックスバッファ作成
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(indexes));
 	ID3D12Resource* ibuff = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(indexes)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&ibuff));
@@ -993,10 +1006,13 @@ Dx12Wrapper::CreatePrimitives() {
 	}
 
 	//頂点バッファ作成
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(cone));
 	ID3D12Resource* coneVBuff = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(cone)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&coneVBuff));
@@ -1013,10 +1029,13 @@ Dx12Wrapper::CreatePrimitives() {
 	
 
 	//インデックスバッファ作成
+	heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(coneIdxes));
 	ID3D12Resource* coneIB = nullptr;
-	result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(sizeof(coneIdxes)),
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&coneIB));
@@ -1483,14 +1502,15 @@ Dx12Wrapper::LoadPictureFromFile(wstring filepath, ComPtr<ID3D12Resource>& buff)
 			scratchImg);
 	}
 	else if (ext == L"dds") {
-		result = LoadFromDDSFile(filepath.c_str(),0,
+		result = LoadFromDDSFile(filepath.c_str(),
+			DDS_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 		isDXT = true;
 	}
 	else {
 		result = LoadFromWICFile(filepath.c_str(),
-			0,
+			WIC_FLAGS_NONE,
 			&metadata,
 			scratchImg);
 	}
@@ -1710,6 +1730,7 @@ bool
 Dx12Wrapper::CreatePera2Resource()
 {
 	auto wsize=Application::Instance().GetWindowSize();
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM,
 		wsize.width,
 		wsize.height);
@@ -1719,7 +1740,8 @@ Dx12Wrapper::CreatePera2Resource()
 	clearValue.Color[0] = clearValue.Color[1] = clearValue.Color[2] = 0.5f;
 	clearValue.Color[3]=1.0f;
 	clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	auto result = _dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	auto result = _dev->CreateCommittedResource(
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,

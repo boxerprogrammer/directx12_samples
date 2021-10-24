@@ -6,6 +6,8 @@
 #include<wrl.h>
 #include<string>
 #include<functional>
+#include<memory>
+#include<algorithm>
 
 class Dx12Wrapper
 {

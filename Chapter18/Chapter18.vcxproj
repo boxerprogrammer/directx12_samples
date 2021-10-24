@@ -88,7 +88,7 @@
       <AdditionalIncludeDirectories>$(DXTK12_DIR)\Inc;$(DXTEX_DIR);$(EFK_ROOT_DIR)\Effekseer;$(EFK_ROOT_DIR)\EffekseerRendererDX12</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(DXTK12_DIR)\Bin\Desktop_2017_Win10\x64\Debug;$(DXTEX_DIR)\Bin\Desktop_2017_Win10\x64\Debug;$(EFK_ROOT_DIR)\Debug;$(EFK_ROOT_DIR)\EffekseerRendererDX12\Debug;$(EFK_ROOT_DIR)\3rdParty\LLGI\src\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(DXTK12_DIR)\Bin\Desktop_2019_Win10\x64\Debug;$(DXTEX_DIR)\Bin\Desktop_2017_Win10\x64\Debug;$(EFK_ROOT_DIR)\Debug;$(EFK_ROOT_DIR)\EffekseerRendererDX12\Debug;$(EFK_ROOT_DIR)\3rdParty\LLGI\src\Debug</AdditionalLibraryDirectories>
       <AdditionalDependencies>DirectXTK12.lib;Effekseer.lib;EffekseerRendererDX12.lib;LLGI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -119,7 +119,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(DXTEX_DIR)\Bin\Desktop_2017_Win10\x64\Release</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(DXTEX_DIR)\Bin\Desktop_2019_Win10\x64\Release</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
