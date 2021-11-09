@@ -11,19 +11,19 @@
 
 //----エフェクトに必要なものの基本--------------
 //エフェクトレンダラ
-EffekseerRenderer::Renderer* _efkRenderer=nullptr;
+EffekseerRenderer::RendererRef _efkRenderer=nullptr;
 //エフェクトマネジャ
-Effekseer::Manager* _efkManager=nullptr;
+Effekseer::ManagerRef _efkManager=nullptr;
 
 //----DX12やVulkan,metalなどのコマンドリスト系への対応のためのもの----
 //メモリプール(詳しくは分かってない)
-EffekseerRenderer::SingleFrameMemoryPool* _efkMemoryPool = nullptr;
+Effekseer::RefPtr<EffekseerRenderer::SingleFrameMemoryPool> _efkMemoryPool = nullptr;
 //コマンドリスト(DX12とかVulkanへの対応のため)
-EffekseerRenderer::CommandList* _efkCmdList = nullptr;
+Effekseer::RefPtr<EffekseerRenderer::CommandList> _efkCmdList = nullptr;
 
 //----エフェクト再生に必要なもの---------------
 //エフェクト本体(エフェクトファイルに対応)
-Effekseer::Effect* _effect=nullptr;
+Effekseer::EffectRef _effect=nullptr;
 // エフェクトハンドル(再生中のエフェクトに対応)
 Effekseer::Handle _efkHandle;
 
@@ -119,7 +119,7 @@ Application::Initialize() {
 		2, //バックバッファの数
 		bbFormats, //レンダーターゲットフォーマット
 		1, //レンダーターゲット数
-		false, //デプスありか？
+		DXGI_FORMAT_UNKNOWN, //デプスフォーマット
 		false, //反対デプスありか？
 		10000);//最大パーティクルの数
 
@@ -143,8 +143,8 @@ Application::Initialize() {
 	_efkManager->SetModelLoader(_efkRenderer->CreateModelLoader());
 
 	//DX12特有の処理
-	_efkMemoryPool = EffekseerRendererDX12::CreateSingleFrameMemoryPool(_efkRenderer);
-	_efkCmdList = EffekseerRendererDX12::CreateCommandList(_efkRenderer, _efkMemoryPool);
+	_efkMemoryPool = EffekseerRenderer::CreateSingleFrameMemoryPool(_efkRenderer->GetGraphicsDevice());
+	_efkCmdList = EffekseerRenderer::CreateCommandList(_efkRenderer->GetGraphicsDevice(), _efkMemoryPool);
 	_efkRenderer->SetCommandList(_efkCmdList);
 
 	SyncronizeEffekseerCamera();
@@ -379,7 +379,7 @@ Application::Run() {
 			POINT pnt;
 			GetCursorPos(&pnt);
 			ScreenToClient(_hwnd, &pnt);
-			_dx12->SetFocusPos(pnt.x, pnt.y);
+			_dx12->SetFocusPos((float)pnt.x, (float)pnt.y);
 		}
 
 		_dx12->CmdList()->SetDescriptorHeaps(1, heapImgui.GetAddressOf());
