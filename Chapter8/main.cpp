@@ -620,8 +620,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//string strModelPath = "Model/hibiki/hibiki.pmd";
 	//string strModelPath = "Model/satori/satori.pmd";
 	//string strModelPath = "Model/reimu/reimu.pmd";
-	string strModelPath = "Model/巡音ルカ.pmd";
-	//string strModelPath = "Model/初音ミク.pmd";
+	//string strModelPath = "Model/巡音ルカ.pmd";
+	string strModelPath = "Model/初音ミク.pmd";
 	FILE* fp;
 	fopen_s(&fp,strModelPath.c_str(), "rb");
 	fread(signature, sizeof(signature), 1, fp);
