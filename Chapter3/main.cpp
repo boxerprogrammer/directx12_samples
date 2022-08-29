@@ -87,7 +87,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #ifdef _DEBUG
 	//デバッグレイヤーをオンに
 	//デバイス生成時前にやっておかないと、デバイス生成後にやると
-	//デバイスがロスとしてしまうので注意
+	//デバイスがロストしてしまうので注意
 	EnableDebugLayer();
 #endif
 	//DirectX12まわり初期化
