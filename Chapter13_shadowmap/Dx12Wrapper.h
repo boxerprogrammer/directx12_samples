@@ -8,6 +8,7 @@
 #include<wrl.h>
 #include<unordered_map>
 #include<memory>
+#include<string>
 
 class PMDActor;
 class PMDRenderer;

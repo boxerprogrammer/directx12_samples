@@ -9,6 +9,7 @@
 #include<unordered_map>
 #include<memory>
 #include<array>
+#include<string>
 
 class PMDActor;
 class PMDRenderer;
